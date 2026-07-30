@@ -1497,11 +1497,21 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                 ),
                 TextButton(
                   onPressed: () {
-                    if (nameCtrl.text.isEmpty) return;
+                    if (nameCtrl.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('⚠️ Пожалуйста, введите название шаблона!'),
+                          backgroundColor: Colors.orange,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                      return;
+                    }
                     final preset = _presets[selectedPresetIdx];
+                    final String templateName = nameCtrl.text.trim();
                     setState(() {
                       final newTemplate = VipTemplate(
-                        name: nameCtrl.text,
+                        name: templateName,
                         gradientColors: preset['colors'] as List<Color>,
                         icon: selectedIcon,
                         shimmerColor: preset['glow'] as Color,
@@ -1520,6 +1530,13 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                       }
                     });
                     Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('✅ Шаблон "$templateName" успешно добавлен!'),
+                        backgroundColor: const Color(0xFF4ade80),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
                   },
                   child: const Text('Добавить', style: TextStyle(color: Color(0xFFCF9E42), fontWeight: FontWeight.bold)),
                 ),
@@ -1633,11 +1650,21 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                 ),
                 TextButton(
                   onPressed: () {
-                    if (nameCtrl.text.isEmpty) return;
+                    if (nameCtrl.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('⚠️ Пожалуйста, введите название игры!'),
+                          backgroundColor: Colors.orange,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                      return;
+                    }
                     final preset = _presets[selectedPresetIdx];
+                    final String gameName = nameCtrl.text.trim();
                     setState(() {
                       gamesCatalogList.add(VipGame(
-                        name: nameCtrl.text,
+                        name: gameName,
                         icon: selectedIcon,
                         gradientColors: preset['colors'] as List<Color>,
                         glowColor: preset['glow'] as Color,
@@ -1645,6 +1672,13 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                       ));
                     });
                     Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('✅ Игра "$gameName" успешно добавлена!'),
+                        backgroundColor: const Color(0xFF4ade80),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
                   },
                   child: const Text('Добавить', style: TextStyle(color: Color(0xFFCF9E42), fontWeight: FontWeight.bold)),
                 ),
