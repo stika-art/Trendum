@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
@@ -878,34 +880,36 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                 ),
                 margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
                 child: ListTile(
-                  leading: item.coverImagePath != null && item.coverImagePath!.isNotEmpty
+                  leading: (item.coverImageBytes != null || (item.coverImagePath != null && item.coverImagePath!.isNotEmpty))
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(6),
                           child: SizedBox(
                             width: 36,
                             height: 48,
-                            child: item.coverImagePath!.endsWith('.mp4') || item.coverImagePath!.endsWith('.mov')
-                                ? LoopingVideoCover(videoPath: item.coverImagePath!)
-                                : item.coverImagePath!.startsWith('http')
-                                    ? Image.network(
-                                        item.coverImagePath!,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) =>
-                                            const Icon(Icons.broken_image, color: Colors.white54),
-                                      )
-                                    : item.coverImagePath!.startsWith('asset:')
-                                        ? Image.asset(
-                                            item.coverImagePath!.substring(6),
+                            child: item.coverImageBytes != null
+                                ? Image.memory(item.coverImageBytes!, fit: BoxFit.cover)
+                                : item.coverImagePath!.endsWith('.mp4') || item.coverImagePath!.endsWith('.mov')
+                                    ? LoopingVideoCover(videoPath: item.coverImagePath!)
+                                    : item.coverImagePath!.startsWith('http')
+                                        ? Image.network(
+                                            item.coverImagePath!,
                                             fit: BoxFit.cover,
                                             errorBuilder: (context, error, stackTrace) =>
                                                 const Icon(Icons.broken_image, color: Colors.white54),
                                           )
-                                        : Image.file(
-                                            File(item.coverImagePath!),
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) =>
-                                                const Icon(Icons.broken_image, color: Colors.white54),
-                                          ),
+                                        : item.coverImagePath!.startsWith('asset:')
+                                            ? Image.asset(
+                                                item.coverImagePath!.substring(6),
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error, stackTrace) =>
+                                                    const Icon(Icons.broken_image, color: Colors.white54),
+                                              )
+                                            : Image.file(
+                                                File(item.coverImagePath!),
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error, stackTrace) =>
+                                                    const Icon(Icons.broken_image, color: Colors.white54),
+                                              ),
                           ),
                         )
                       : CircleAvatar(
@@ -1078,8 +1082,10 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   void _showAddTemplateDialog(bool isPhoto) {
     final TextEditingController nameCtrl = TextEditingController();
     final TextEditingController promptCtrl = TextEditingController();
-    String? selectedCoverData;
-    List<String> selectedPromptImages = [];
+    String? selectedCoverPath;      // для натива (Windows)
+    Uint8List? selectedCoverBytes;  // для веба
+    List<String> selectedPromptPaths = [];      // для натива
+    List<Uint8List> selectedPromptBytes = [];   // для веба
     IconData selectedIcon = Icons.auto_awesome_rounded;
     int selectedPresetIdx = 0;
     bool isAiSelected = false;
@@ -1124,9 +1130,25 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                           type: FileType.custom,
                           allowedExtensions: ['png', 'jpg', 'jpeg', 'mp4', 'mov'],
                           allowMultiple: false,
+                          withData: true,
                         );
-                        if (result != null && result.files.single.path != null) {
-                          setDialogState(() => selectedCoverData = result.files.single.path);
+                        if (result != null) {
+                          final file = result.files.single;
+                          if (kIsWeb) {
+                            if (file.bytes != null) {
+                              setDialogState(() {
+                                selectedCoverBytes = file.bytes;
+                                selectedCoverPath = null;
+                              });
+                            }
+                          } else {
+                            if (file.path != null) {
+                              setDialogState(() {
+                                selectedCoverPath = file.path;
+                                selectedCoverBytes = null;
+                              });
+                            }
+                          }
                         }
                       },
                       child: Container(
@@ -1135,7 +1157,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: selectedCoverData != null
+                            color: (selectedCoverBytes != null || selectedCoverPath != null)
                                 ? const Color(0xFFCF9E42)
                                 : Colors.white24,
                             width: 1.5,
@@ -1143,21 +1165,23 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                           color: Colors.white.withValues(alpha: 0.04),
                         ),
                         clipBehavior: Clip.antiAlias,
-                        child: selectedCoverData != null
+                        child: (selectedCoverBytes != null || selectedCoverPath != null)
                             ? Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  selectedCoverData!.endsWith('.mp4') || selectedCoverData!.endsWith('.mov')
-                                      ? LoopingVideoCover(videoPath: selectedCoverData!)
-                                      : Image.file(
-                                          File(selectedCoverData!),
-                                          fit: BoxFit.cover,
-                                        ),
+                                  selectedCoverBytes != null
+                                      ? Image.memory(selectedCoverBytes!, fit: BoxFit.cover)
+                                      : (selectedCoverPath!.endsWith('.mp4') || selectedCoverPath!.endsWith('.mov'))
+                                          ? LoopingVideoCover(videoPath: selectedCoverPath!)
+                                          : Image.file(File(selectedCoverPath!), fit: BoxFit.cover),
                                   Positioned(
                                     top: 6,
                                     right: 6,
                                     child: GestureDetector(
-                                      onTap: () => setDialogState(() => selectedCoverData = null),
+                                      onTap: () => setDialogState(() {
+                                        selectedCoverBytes = null;
+                                        selectedCoverPath = null;
+                                      }),
                                       child: Container(
                                         padding: const EdgeInsets.all(4),
                                         decoration: const BoxDecoration(
@@ -1301,8 +1325,9 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                       // Три ячейки для референс-фото
                       Row(
                         children: List.generate(3, (slotIndex) {
-                          final bool hasImage = slotIndex < selectedPromptImages.length;
-                          final bool canAdd = selectedPromptImages.length == slotIndex;
+                          final int count = kIsWeb ? selectedPromptBytes.length : selectedPromptPaths.length;
+                          final bool hasImage = slotIndex < count;
+                          final bool canAdd = count == slotIndex;
                           return Expanded(
                             child: Padding(
                               padding: EdgeInsets.only(right: slotIndex < 2 ? 8.0 : 0),
@@ -1313,11 +1338,15 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                   final result = await FilePicker.platform.pickFiles(
                                     type: FileType.image,
                                     allowMultiple: false,
+                                    withData: true,
                                   );
-                                  if (result != null && result.files.single.path != null) {
-                                    setDialogState(() {
-                                      selectedPromptImages.add(result.files.single.path!);
-                                    });
+                                  if (result != null) {
+                                    final file = result.files.single;
+                                    if (kIsWeb && file.bytes != null) {
+                                      setDialogState(() => selectedPromptBytes.add(file.bytes!));
+                                    } else if (!kIsWeb && file.path != null) {
+                                      setDialogState(() => selectedPromptPaths.add(file.path!));
+                                    }
                                   }
                                 },
                                 child: AspectRatio(
@@ -1340,15 +1369,18 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                         ? Stack(
                                             fit: StackFit.expand,
                                             children: [
-                                              Image.file(
-                                                File(selectedPromptImages[slotIndex]),
-                                                fit: BoxFit.cover,
-                                              ),
+                                              kIsWeb
+                                                  ? Image.memory(selectedPromptBytes[slotIndex], fit: BoxFit.cover)
+                                                  : Image.file(File(selectedPromptPaths[slotIndex]), fit: BoxFit.cover),
                                               Positioned(
                                                 top: 4, right: 4,
                                                 child: GestureDetector(
                                                   onTap: () => setDialogState(() {
-                                                    selectedPromptImages.removeAt(slotIndex);
+                                                    if (kIsWeb) {
+                                                      selectedPromptBytes.removeAt(slotIndex);
+                                                    } else {
+                                                      selectedPromptPaths.removeAt(slotIndex);
+                                                    }
                                                   }),
                                                   child: Container(
                                                     padding: const EdgeInsets.all(3),
@@ -1420,9 +1452,11 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                         shimmerColor: preset['glow'] as Color,
                         isAi: isAiSelected,
                         prompt: isAiSelected ? promptCtrl.text : null,
-                        promptImagePaths: isAiSelected && selectedPromptImages.isNotEmpty ? List.from(selectedPromptImages) : null,
+                        promptImagePaths: (!kIsWeb && isAiSelected && selectedPromptPaths.isNotEmpty) ? List.from(selectedPromptPaths) : null,
+                        promptImageBytes: (kIsWeb && isAiSelected && selectedPromptBytes.isNotEmpty) ? List.from(selectedPromptBytes) : null,
                         resultImagePath: isAiSelected ? 'pennywise_ai_result.png' : null,
-                        coverImagePath: selectedCoverData,
+                        coverImagePath: !kIsWeb ? selectedCoverPath : null,
+                        coverImageBytes: kIsWeb ? selectedCoverBytes : null,
                       );
                       if (isPhoto) {
                         photoTemplatesList.add(newTemplate);
@@ -2785,16 +2819,18 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (_selectedTemplate?.coverImagePath != null)
+            if (_selectedTemplate?.coverImageBytes != null || _selectedTemplate?.coverImagePath != null)
               Opacity(
                 opacity: 0.25,
-                child: _selectedTemplate!.coverImagePath!.endsWith('.mp4') || _selectedTemplate!.coverImagePath!.endsWith('.mov')
-                    ? LoopingVideoCover(videoPath: _selectedTemplate!.coverImagePath!)
-                    : _selectedTemplate!.coverImagePath!.startsWith('http')
-                        ? Image.network(_selectedTemplate!.coverImagePath!, fit: BoxFit.cover)
-                        : _selectedTemplate!.coverImagePath!.startsWith('asset:')
-                            ? Image.asset(_selectedTemplate!.coverImagePath!.substring(6), fit: BoxFit.cover)
-                            : Image.file(File(_selectedTemplate!.coverImagePath!), fit: BoxFit.cover),
+                child: _selectedTemplate!.coverImageBytes != null
+                    ? Image.memory(_selectedTemplate!.coverImageBytes!, fit: BoxFit.cover)
+                    : _selectedTemplate!.coverImagePath!.endsWith('.mp4') || _selectedTemplate!.coverImagePath!.endsWith('.mov')
+                        ? LoopingVideoCover(videoPath: _selectedTemplate!.coverImagePath!)
+                        : _selectedTemplate!.coverImagePath!.startsWith('http')
+                            ? Image.network(_selectedTemplate!.coverImagePath!, fit: BoxFit.cover)
+                            : _selectedTemplate!.coverImagePath!.startsWith('asset:')
+                                ? Image.asset(_selectedTemplate!.coverImagePath!.substring(6), fit: BoxFit.cover)
+                                : Image.file(File(_selectedTemplate!.coverImagePath!), fit: BoxFit.cover),
               ),
             Center(
               child: Column(
@@ -4282,9 +4318,11 @@ class VipTemplate {
   Color shimmerColor;
   bool isAi;
   String? prompt;
-  List<String>? promptImagePaths; // До 3 референс-фото для промта ИИ
+  List<String>? promptImagePaths;    // Пути до 3 референс-фото (натив)
+  List<Uint8List>? promptImageBytes; // Байты до 3 референс-фото (веб)
   String? resultImagePath;
-  String? coverImagePath;
+  String? coverImagePath;  // Путь к обложке (натив)
+  Uint8List? coverImageBytes; // Байты обложки (веб)
 
   VipTemplate({
     required this.name,
@@ -4294,8 +4332,10 @@ class VipTemplate {
     this.isAi = false,
     this.prompt,
     this.promptImagePaths,
+    this.promptImageBytes,
     this.resultImagePath,
     this.coverImagePath,
+    this.coverImageBytes,
   });
 }
 
@@ -4358,7 +4398,6 @@ class _PremiumTemplateCardState extends State<_PremiumTemplateCard> with SingleT
   }
 
   Widget _buildCoverImage(VipTemplate template) {
-    final String path = template.coverImagePath!;
     final Widget fallback = Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -4368,6 +4407,13 @@ class _PremiumTemplateCardState extends State<_PremiumTemplateCard> with SingleT
         ),
       ),
     );
+    // Веб: используем байты
+    if (template.coverImageBytes != null) {
+      return Image.memory(template.coverImageBytes!, fit: BoxFit.cover, errorBuilder: (ctx, e, st) => fallback);
+    }
+    // Натив: используем путь
+    final String? path = template.coverImagePath;
+    if (path == null || path.isEmpty) return fallback;
     if (path.endsWith('.mp4') || path.endsWith('.mov')) {
       return LoopingVideoCover(videoPath: path);
     } else if (path.startsWith('http')) {
@@ -4381,7 +4427,8 @@ class _PremiumTemplateCardState extends State<_PremiumTemplateCard> with SingleT
 
   @override
   Widget build(BuildContext context) {
-    final bool hasCover = widget.template.coverImagePath != null && widget.template.coverImagePath!.isNotEmpty;
+    final bool hasCover = widget.template.coverImageBytes != null ||
+        (widget.template.coverImagePath != null && widget.template.coverImagePath!.isNotEmpty);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
