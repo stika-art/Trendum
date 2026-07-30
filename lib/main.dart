@@ -6,6 +6,63 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
+import 'package:video_player/video_player.dart';
+
+// Виджет для фонового зацикленного видео
+class LoopingVideoCover extends StatefulWidget {
+  final String videoPath;
+  const LoopingVideoCover({super.key, required this.videoPath});
+
+  @override
+  State<LoopingVideoCover> createState() => _LoopingVideoCoverState();
+}
+
+class _LoopingVideoCoverState extends State<LoopingVideoCover> {
+  late VideoPlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.videoPath.startsWith('http')) {
+      _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoPath));
+    } else if (widget.videoPath.startsWith('asset:')) {
+      _controller = VideoPlayerController.asset(widget.videoPath.substring(6));
+    } else {
+      _controller = VideoPlayerController.file(File(widget.videoPath));
+    }
+    
+    _controller.initialize().then((_) {
+      _controller.setLooping(true);
+      _controller.setVolume(0.0);
+      _controller.play();
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_controller.value.isInitialized) {
+      return SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: _controller.value.size.width,
+            height: _controller.value.size.height,
+            child: VideoPlayer(_controller),
+          ),
+        ),
+      );
+    } else {
+      return Container(color: Colors.black26);
+    }
+  }
+}
 
 // Флаг для переключения режима интерфейса:
 // true  - режим "Киоск в ТЦ" (гигантские масштабированные элементы, крупные шрифты и отступы)
@@ -827,26 +884,28 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                           child: SizedBox(
                             width: 36,
                             height: 48,
-                            child: item.coverImagePath!.startsWith('http')
-                                ? Image.network(
-                                    item.coverImagePath!,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                        const Icon(Icons.broken_image, color: Colors.white54),
-                                  )
-                                : item.coverImagePath!.startsWith('asset:')
-                                    ? Image.asset(
-                                        item.coverImagePath!.substring(6),
+                            child: item.coverImagePath!.endsWith('.mp4') || item.coverImagePath!.endsWith('.mov')
+                                ? LoopingVideoCover(videoPath: item.coverImagePath!)
+                                : item.coverImagePath!.startsWith('http')
+                                    ? Image.network(
+                                        item.coverImagePath!,
                                         fit: BoxFit.cover,
                                         errorBuilder: (context, error, stackTrace) =>
                                             const Icon(Icons.broken_image, color: Colors.white54),
                                       )
-                                    : Image.file(
-                                        File(item.coverImagePath!),
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) =>
-                                            const Icon(Icons.broken_image, color: Colors.white54),
-                                      ),
+                                    : item.coverImagePath!.startsWith('asset:')
+                                        ? Image.asset(
+                                            item.coverImagePath!.substring(6),
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) =>
+                                                const Icon(Icons.broken_image, color: Colors.white54),
+                                          )
+                                        : Image.file(
+                                            File(item.coverImagePath!),
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) =>
+                                                const Icon(Icons.broken_image, color: Colors.white54),
+                                          ),
                           ),
                         )
                       : CircleAvatar(
@@ -1061,7 +1120,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                     GestureDetector(
                       onTap: () async {
                         final result = await FilePicker.platform.pickFiles(
-                          type: FileType.image,
+                          type: FileType.custom,
+                          allowedExtensions: ['png', 'jpg', 'jpeg', 'mp4', 'mov'],
                           allowMultiple: false,
                         );
                         if (result != null && result.files.single.path != null) {
@@ -1086,10 +1146,12 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                             ? Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  Image.file(
-                                    File(selectedCoverData!),
-                                    fit: BoxFit.cover,
-                                  ),
+                                  selectedCoverData!.endsWith('.mp4') || selectedCoverData!.endsWith('.mov')
+                                      ? LoopingVideoCover(videoPath: selectedCoverData!)
+                                      : Image.file(
+                                          File(selectedCoverData!),
+                                          fit: BoxFit.cover,
+                                        ),
                                   Positioned(
                                     top: 6,
                                     right: 6,
@@ -2599,11 +2661,13 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
             if (_selectedTemplate?.coverImagePath != null)
               Opacity(
                 opacity: 0.25,
-                child: _selectedTemplate!.coverImagePath!.startsWith('http')
-                    ? Image.network(_selectedTemplate!.coverImagePath!, fit: BoxFit.cover)
-                    : _selectedTemplate!.coverImagePath!.startsWith('asset:')
-                        ? Image.asset(_selectedTemplate!.coverImagePath!.substring(6), fit: BoxFit.cover)
-                        : Image.file(File(_selectedTemplate!.coverImagePath!), fit: BoxFit.cover),
+                child: _selectedTemplate!.coverImagePath!.endsWith('.mp4') || _selectedTemplate!.coverImagePath!.endsWith('.mov')
+                    ? LoopingVideoCover(videoPath: _selectedTemplate!.coverImagePath!)
+                    : _selectedTemplate!.coverImagePath!.startsWith('http')
+                        ? Image.network(_selectedTemplate!.coverImagePath!, fit: BoxFit.cover)
+                        : _selectedTemplate!.coverImagePath!.startsWith('asset:')
+                            ? Image.asset(_selectedTemplate!.coverImagePath!.substring(6), fit: BoxFit.cover)
+                            : Image.file(File(_selectedTemplate!.coverImagePath!), fit: BoxFit.cover),
               ),
             Center(
               child: Column(
@@ -4175,7 +4239,9 @@ class _PremiumTemplateCardState extends State<_PremiumTemplateCard> with SingleT
         ),
       ),
     );
-    if (path.startsWith('http')) {
+    if (path.endsWith('.mp4') || path.endsWith('.mov')) {
+      return LoopingVideoCover(videoPath: path);
+    } else if (path.startsWith('http')) {
       return Image.network(path, fit: BoxFit.cover, errorBuilder: (ctx, e, st) => fallback);
     } else if (path.startsWith('asset:')) {
       return Image.asset(path.substring(6), fit: BoxFit.cover, errorBuilder: (ctx, e, st) => fallback);
