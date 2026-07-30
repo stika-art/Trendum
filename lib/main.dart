@@ -1079,7 +1079,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     final TextEditingController nameCtrl = TextEditingController();
     final TextEditingController promptCtrl = TextEditingController();
     String? selectedCoverData;
-    String? selectedPromptImageData;
+    List<String> selectedPromptImages = [];
     IconData selectedIcon = Icons.auto_awesome_rounded;
     int selectedPresetIdx = 0;
     bool isAiSelected = false;
@@ -1289,89 +1289,115 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                             color: Colors.white.withValues(alpha: 0.07),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Text('Необязательно', style: TextStyle(color: Colors.white38, fontSize: 10)),
+                          child: const Text('До 3 фото', style: TextStyle(color: Colors.white38, fontSize: 10)),
                         ),
                       ]),
                       const SizedBox(height: 4),
                       const Text(
-                        'ИИ будет ориентироваться на этот образец при генерации',
+                        'ИИ будет ориентироваться на эти образцы при генерации',
                         style: TextStyle(color: Colors.white38, fontSize: 11),
                       ),
                       const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: () async {
-                          final result = await FilePicker.platform.pickFiles(
-                            type: FileType.image,
-                            allowMultiple: false,
-                          );
-                          if (result != null && result.files.single.path != null) {
-                            setDialogState(() => selectedPromptImageData = result.files.single.path);
-                          }
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          height: 110,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: selectedPromptImageData != null
-                                  ? const Color(0xFF6C25FF)
-                                  : Colors.white24,
-                              width: 1.5,
-                            ),
-                            color: Colors.white.withValues(alpha: 0.03),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: selectedPromptImageData != null
-                              ? Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    Image.file(
-                                      File(selectedPromptImageData!),
-                                      fit: BoxFit.cover,
+                      // Три ячейки для референс-фото
+                      Row(
+                        children: List.generate(3, (slotIndex) {
+                          final bool hasImage = slotIndex < selectedPromptImages.length;
+                          final bool canAdd = selectedPromptImages.length == slotIndex;
+                          return Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(right: slotIndex < 2 ? 8.0 : 0),
+                              child: GestureDetector(
+                                onTap: () async {
+                                  if (hasImage) return;
+                                  if (!canAdd) return;
+                                  final result = await FilePicker.platform.pickFiles(
+                                    type: FileType.image,
+                                    allowMultiple: false,
+                                  );
+                                  if (result != null && result.files.single.path != null) {
+                                    setDialogState(() {
+                                      selectedPromptImages.add(result.files.single.path!);
+                                    });
+                                  }
+                                },
+                                child: AspectRatio(
+                                  aspectRatio: 1,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: hasImage
+                                            ? const Color(0xFF6C25FF)
+                                            : canAdd
+                                                ? Colors.white24
+                                                : Colors.white10,
+                                        width: 1.5,
+                                      ),
+                                      color: Colors.white.withValues(alpha: hasImage ? 0.0 : 0.03),
                                     ),
-                                    Positioned(
-                                      top: 4, right: 4,
-                                      child: GestureDetector(
-                                        onTap: () => setDialogState(() => selectedPromptImageData = null),
-                                        child: Container(
-                                          padding: const EdgeInsets.all(3),
-                                          decoration: const BoxDecoration(
-                                            color: Colors.black54,
-                                            shape: BoxShape.circle,
+                                    clipBehavior: Clip.antiAlias,
+                                    child: hasImage
+                                        ? Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              Image.file(
+                                                File(selectedPromptImages[slotIndex]),
+                                                fit: BoxFit.cover,
+                                              ),
+                                              Positioned(
+                                                top: 4, right: 4,
+                                                child: GestureDetector(
+                                                  onTap: () => setDialogState(() {
+                                                    selectedPromptImages.removeAt(slotIndex);
+                                                  }),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.all(3),
+                                                    decoration: const BoxDecoration(
+                                                      color: Colors.black54,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: const Icon(Icons.close, color: Colors.white, size: 12),
+                                                  ),
+                                                ),
+                                              ),
+                                              Positioned(
+                                                bottom: 0, left: 0, right: 0,
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(vertical: 3),
+                                                  color: Colors.black54,
+                                                  child: Text(
+                                                    'Фото ${slotIndex + 1}',
+                                                    style: const TextStyle(color: Color(0xFF9D4EDD), fontSize: 10),
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          )
+                                        : Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.add_photo_alternate_outlined,
+                                                color: canAdd ? const Color(0xFF9D4EDD) : Colors.white12,
+                                                size: 22,
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                '${slotIndex + 1}',
+                                                style: TextStyle(
+                                                  color: canAdd ? Colors.white38 : Colors.white12,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                          child: const Icon(Icons.close, color: Colors.white, size: 14),
-                                        ),
-                                      ),
-                                    ),
-                                    Positioned(
-                                      bottom: 0, left: 0, right: 0,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 5),
-                                        color: Colors.black54,
-                                        child: const Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.check_circle_rounded, color: Color(0xFF9D4EDD), size: 12),
-                                            SizedBox(width: 4),
-                                            Text('Референс загружен', style: TextStyle(color: Color(0xFF9D4EDD), fontSize: 11)),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : const Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.add_photo_alternate_outlined, color: Color(0xFF9D4EDD), size: 28),
-                                    SizedBox(height: 6),
-                                    Text('Нажмите, чтобы загрузить референс', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                                    SizedBox(height: 2),
-                                    Text('(PNG, JPG)', style: TextStyle(color: Colors.white30, fontSize: 10)),
-                                  ],
+                                  ),
                                 ),
-                        ),
+                              ),
+                            ),
+                          );
+                        }),
                       ),
                     ],
                   ],
@@ -1394,7 +1420,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                         shimmerColor: preset['glow'] as Color,
                         isAi: isAiSelected,
                         prompt: isAiSelected ? promptCtrl.text : null,
-                        promptImagePath: isAiSelected ? selectedPromptImageData : null,
+                        promptImagePaths: isAiSelected && selectedPromptImages.isNotEmpty ? List.from(selectedPromptImages) : null,
                         resultImagePath: isAiSelected ? 'pennywise_ai_result.png' : null,
                         coverImagePath: selectedCoverData,
                       );
@@ -4256,7 +4282,7 @@ class VipTemplate {
   Color shimmerColor;
   bool isAi;
   String? prompt;
-  String? promptImagePath; // Референс-фото для промта ИИ
+  List<String>? promptImagePaths; // До 3 референс-фото для промта ИИ
   String? resultImagePath;
   String? coverImagePath;
 
@@ -4267,7 +4293,7 @@ class VipTemplate {
     required this.shimmerColor,
     this.isAi = false,
     this.prompt,
-    this.promptImagePath,
+    this.promptImagePaths,
     this.resultImagePath,
     this.coverImagePath,
   });
