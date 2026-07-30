@@ -4497,15 +4497,37 @@ class VipTemplate {
   }
 }
 
+const String supabaseUrl = 'https://jyxswnwzwpitaiwxffuo.supabase.co';
+const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eHN3bnd6d3BpdGFpd3hmZnVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0MTQ2MDgsImV4cCI6MjEwMDk5MDYwOH0.ozLBd6wYzoAxItPmO-QFPMqjfjTdo8-lgxlCd0TU56c';
+
 Future<void> saveTemplatesToStorage() async {
+  final photoJson = jsonEncode(photoTemplatesList.map((t) => t.toJson()).toList());
+  final videoJson = jsonEncode(videoTemplatesList.map((t) => t.toJson()).toList());
   try {
     final prefs = await SharedPreferences.getInstance();
-    final photoJson = jsonEncode(photoTemplatesList.map((t) => t.toJson()).toList());
-    final videoJson = jsonEncode(videoTemplatesList.map((t) => t.toJson()).toList());
     await prefs.setString('trendum_photo_templates', photoJson);
     await prefs.setString('trendum_video_templates', videoJson);
   } catch (e) {
-    debugPrint('Error saving templates: $e');
+    debugPrint('Error saving templates locally: $e');
+  }
+
+  // Облачная синхронизация с Supabase
+  try {
+    await http.post(
+      Uri.parse('$supabaseUrl/rest/v1/app_storage'),
+      headers: {
+        'apikey': supabaseAnonKey,
+        'Authorization': 'Bearer $supabaseAnonKey',
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates',
+      },
+      body: jsonEncode([
+        {'key': 'photo_templates', 'value': photoJson},
+        {'key': 'video_templates', 'value': videoJson},
+      ]),
+    );
+  } catch (e) {
+    debugPrint('Error saving templates to Supabase: $e');
   }
 }
 
@@ -4523,7 +4545,40 @@ Future<void> loadTemplatesFromStorage() async {
       videoTemplatesList = decoded.map((j) => VipTemplate.fromJson(j as Map<String, dynamic>)).toList();
     }
   } catch (e) {
-    debugPrint('Error loading templates: $e');
+    debugPrint('Error loading templates locally: $e');
+  }
+
+  // Загрузка из облака Supabase
+  try {
+    final res = await http.get(
+      Uri.parse('$supabaseUrl/rest/v1/app_storage?select=*'),
+      headers: {
+        'apikey': supabaseAnonKey,
+        'Authorization': 'Bearer $supabaseAnonKey',
+      },
+    );
+    if (res.statusCode == 200) {
+      final List data = jsonDecode(res.body);
+      bool updated = false;
+      for (final row in data) {
+        if (row['key'] == 'photo_templates' && row['value'] != null) {
+          final List decoded = jsonDecode(row['value']);
+          photoTemplatesList = decoded.map((j) => VipTemplate.fromJson(j as Map<String, dynamic>)).toList();
+          updated = true;
+        } else if (row['key'] == 'video_templates' && row['value'] != null) {
+          final List decoded = jsonDecode(row['value']);
+          videoTemplatesList = decoded.map((j) => VipTemplate.fromJson(j as Map<String, dynamic>)).toList();
+          updated = true;
+        }
+      }
+      if (updated) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('trendum_photo_templates', jsonEncode(photoTemplatesList.map((t) => t.toJson()).toList()));
+        await prefs.setString('trendum_video_templates', jsonEncode(videoTemplatesList.map((t) => t.toJson()).toList()));
+      }
+    }
+  } catch (e) {
+    debugPrint('Error loading templates from Supabase: $e');
   }
 }
 
