@@ -1390,18 +1390,23 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                 onTap: () async {
                                   if (hasImage) return;
                                   if (!canAdd) return;
-                                  final result = await FilePicker.platform.pickFiles(
-                                    type: FileType.image,
-                                    allowMultiple: false,
-                                    withData: true,
-                                  );
-                                  if (result != null) {
-                                    final file = result.files.single;
-                                    if (kIsWeb && file.bytes != null) {
-                                      setDialogState(() => selectedPromptBytes.add(file.bytes!));
-                                    } else if (!kIsWeb && file.path != null) {
-                                      setDialogState(() => selectedPromptPaths.add(file.path!));
+                                  try {
+                                    final result = await FilePicker.platform.pickFiles(
+                                      type: FileType.image,
+                                      allowMultiple: false,
+                                      withData: true,
+                                    );
+                                    if (result != null && result.files.isNotEmpty) {
+                                      final file = result.files.single;
+                                      if (file.bytes != null && file.bytes!.isNotEmpty) {
+                                        setDialogState(() => selectedPromptBytes.add(file.bytes!));
+                                      }
+                                      if (file.path != null && file.path!.isNotEmpty) {
+                                        setDialogState(() => selectedPromptPaths.add(file.path!));
+                                      }
                                     }
+                                  } catch (e) {
+                                    debugPrint('Error picking prompt image: $e');
                                   }
                                 },
                                 child: AspectRatio(
@@ -1424,16 +1429,17 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                         ? Stack(
                                             fit: StackFit.expand,
                                             children: [
-                                              kIsWeb
+                                              (selectedPromptBytes.length > slotIndex)
                                                   ? Image.memory(selectedPromptBytes[slotIndex], fit: BoxFit.cover)
                                                   : Image.file(File(selectedPromptPaths[slotIndex]), fit: BoxFit.cover),
                                               Positioned(
                                                 top: 4, right: 4,
                                                 child: GestureDetector(
                                                   onTap: () => setDialogState(() {
-                                                    if (kIsWeb) {
+                                                    if (selectedPromptBytes.length > slotIndex) {
                                                       selectedPromptBytes.removeAt(slotIndex);
-                                                    } else {
+                                                    }
+                                                    if (selectedPromptPaths.length > slotIndex) {
                                                       selectedPromptPaths.removeAt(slotIndex);
                                                     }
                                                   }),
@@ -1517,11 +1523,11 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                         shimmerColor: preset['glow'] as Color,
                         isAi: isAiSelected,
                         prompt: isAiSelected ? promptCtrl.text : null,
-                        promptImagePaths: (!kIsWeb && isAiSelected && selectedPromptPaths.isNotEmpty) ? List.from(selectedPromptPaths) : null,
-                        promptImageBytes: (kIsWeb && isAiSelected && selectedPromptBytes.isNotEmpty) ? List.from(selectedPromptBytes) : null,
+                        promptImagePaths: selectedPromptPaths.isNotEmpty ? List.from(selectedPromptPaths) : null,
+                        promptImageBytes: selectedPromptBytes.isNotEmpty ? List.from(selectedPromptBytes) : null,
                         resultImagePath: isAiSelected ? 'pennywise_ai_result.png' : null,
-                        coverImagePath: !kIsWeb ? selectedCoverPath : null,
-                        coverImageBytes: kIsWeb ? selectedCoverBytes : null,
+                        coverImagePath: selectedCoverPath,
+                        coverImageBytes: selectedCoverBytes,
                       );
                       if (isPhoto) {
                         photoTemplatesList.add(newTemplate);
