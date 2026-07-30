@@ -2,6 +2,10 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/admin",
+      "destination": "/build/web/index.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/build/web/$1"
     }
