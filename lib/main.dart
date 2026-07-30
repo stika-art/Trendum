@@ -1886,8 +1886,14 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
           }
         }
       } else if (aiApiProvider == 'Nano Banana Pro') {
-        final String modelName = isVideo ? 'gemini-omni-video' : 'nano-banana-pro';
+        final String modelName = isVideo ? 'gemini-omni-video' : 'nano-banana-2';
         debugPrint('[AI Banana] Sending task request to Kie.ai (model: $modelName)...');
+        final Map<String, dynamic> inputPayload = {
+          'prompt': prompt,
+        };
+        if (isVideo) {
+          inputPayload['resolution'] = '1080P';
+        }
         final response = await http.post(
           Uri.parse('https://api.kie.ai/api/v1/jobs/createTask'),
           headers: {
@@ -1895,10 +1901,8 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
             'Authorization': 'Bearer $aiApiKey',
           },
           body: jsonEncode({
-            'model': 'nano-banana-pro',
-            'input': {
-              'prompt': prompt,
-            }
+            'model': modelName,
+            'input': inputPayload,
           }),
         );
         if (response.statusCode == 200 || response.statusCode == 201) {
