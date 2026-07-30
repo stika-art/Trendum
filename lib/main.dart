@@ -1893,6 +1893,7 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
         };
         if (isVideo) {
           inputPayload['resolution'] = '1080P';
+          inputPayload['duration'] = '10s';
         }
         final response = await http.post(
           Uri.parse('https://api.kie.ai/api/v1/jobs/createTask'),
