@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Виджет для фонового зацикленного видео
 class LoopingVideoCover extends StatefulWidget {
@@ -305,6 +306,30 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 800),
     );
     _contentAnimationController.forward();
+    _loadSavedApiKey();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final String url = Uri.base.toString().toLowerCase();
+      if (url.contains('/admin') || url.contains('admin')) {
+        _showPinDialog();
+      }
+    });
+  }
+
+  Future<void> _loadSavedApiKey() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? savedKey = prefs.getString('trendum_ai_api_key');
+      if (savedKey != null && savedKey.isNotEmpty) {
+        setState(() {
+          aiApiKey = savedKey;
+          aiApiProvider = 'Nano Banana Pro';
+          _apiKeyController.text = savedKey;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading saved API key: $e');
+    }
   }
 
   @override
@@ -807,6 +832,36 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
               aiApiKey = val;
               aiApiProvider = 'Nano Banana Pro';
             },
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                final String key = _apiKeyController.text.trim();
+                aiApiKey = key;
+                aiApiProvider = 'Nano Banana Pro';
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('trendum_ai_api_key', key);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ API-ключ KIE.AI успешно сохранён!'),
+                      backgroundColor: Color(0xFF4ade80),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFCF9E42),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.save_rounded, size: 18),
+              label: const Text('Сохранить API Ключ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            ),
           ),
 
           const SizedBox(height: 12),
