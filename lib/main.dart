@@ -1079,6 +1079,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     final TextEditingController nameCtrl = TextEditingController();
     final TextEditingController promptCtrl = TextEditingController();
     String? selectedCoverData;
+    String? selectedPromptImageData;
     IconData selectedIcon = Icons.auto_awesome_rounded;
     int selectedPresetIdx = 0;
     bool isAiSelected = false;
@@ -1260,6 +1261,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                     if (isAiSelected) ...[
                       const SizedBox(height: 12),
                       const Text('Промпт для ИИ:', style: TextStyle(color: Colors.white70)),
+                      const SizedBox(height: 4),
                       TextField(
                         controller: promptCtrl,
                         style: const TextStyle(color: Colors.white, fontSize: 13),
@@ -1271,6 +1273,104 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                           hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
                           enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
                           focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFFCF9E42))),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Divider(color: Colors.white12),
+                      const SizedBox(height: 8),
+                      Row(children: [
+                        const Icon(Icons.auto_awesome_rounded, color: Color(0xFF9D4EDD), size: 14),
+                        const SizedBox(width: 6),
+                        const Text('Референс-фото для ИИ', style: TextStyle(color: Color(0xFF9D4EDD), fontSize: 13, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.07),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text('Необязательно', style: TextStyle(color: Colors.white38, fontSize: 10)),
+                        ),
+                      ]),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'ИИ будет ориентироваться на этот образец при генерации',
+                        style: TextStyle(color: Colors.white38, fontSize: 11),
+                      ),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: () async {
+                          final result = await FilePicker.platform.pickFiles(
+                            type: FileType.image,
+                            allowMultiple: false,
+                          );
+                          if (result != null && result.files.single.path != null) {
+                            setDialogState(() => selectedPromptImageData = result.files.single.path);
+                          }
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          height: 110,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: selectedPromptImageData != null
+                                  ? const Color(0xFF6C25FF)
+                                  : Colors.white24,
+                              width: 1.5,
+                            ),
+                            color: Colors.white.withValues(alpha: 0.03),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: selectedPromptImageData != null
+                              ? Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Image.file(
+                                      File(selectedPromptImageData!),
+                                      fit: BoxFit.cover,
+                                    ),
+                                    Positioned(
+                                      top: 4, right: 4,
+                                      child: GestureDetector(
+                                        onTap: () => setDialogState(() => selectedPromptImageData = null),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(3),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.black54,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(Icons.close, color: Colors.white, size: 14),
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: 0, left: 0, right: 0,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 5),
+                                        color: Colors.black54,
+                                        child: const Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.check_circle_rounded, color: Color(0xFF9D4EDD), size: 12),
+                                            SizedBox(width: 4),
+                                            Text('Референс загружен', style: TextStyle(color: Color(0xFF9D4EDD), fontSize: 11)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.add_photo_alternate_outlined, color: Color(0xFF9D4EDD), size: 28),
+                                    SizedBox(height: 6),
+                                    Text('Нажмите, чтобы загрузить референс', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                                    SizedBox(height: 2),
+                                    Text('(PNG, JPG)', style: TextStyle(color: Colors.white30, fontSize: 10)),
+                                  ],
+                                ),
                         ),
                       ),
                     ],
@@ -1294,6 +1394,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                         shimmerColor: preset['glow'] as Color,
                         isAi: isAiSelected,
                         prompt: isAiSelected ? promptCtrl.text : null,
+                        promptImagePath: isAiSelected ? selectedPromptImageData : null,
                         resultImagePath: isAiSelected ? 'pennywise_ai_result.png' : null,
                         coverImagePath: selectedCoverData,
                       );
@@ -4155,6 +4256,7 @@ class VipTemplate {
   Color shimmerColor;
   bool isAi;
   String? prompt;
+  String? promptImagePath; // Референс-фото для промта ИИ
   String? resultImagePath;
   String? coverImagePath;
 
@@ -4165,6 +4267,7 @@ class VipTemplate {
     required this.shimmerColor,
     this.isAi = false,
     this.prompt,
+    this.promptImagePath,
     this.resultImagePath,
     this.coverImagePath,
   });
