@@ -1193,7 +1193,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                   SizedBox(height: 8),
                                   Text('Нажмите, чтобы загрузить', style: TextStyle(color: Colors.white54, fontSize: 13)),
                                   SizedBox(height: 4),
-                                  Text('Формат 9:16 (PNG, JPG)', style: TextStyle(color: Colors.white30, fontSize: 11)),
+                                  Text('Формат 9:16 (PNG, JPG, MP4)', style: TextStyle(color: Colors.white30, fontSize: 11)),
                                 ],
                               ),
                       ),
