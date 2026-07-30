@@ -327,8 +327,12 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
           _apiKeyController.text = savedKey;
         });
       }
+      await loadTemplatesFromStorage();
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
-      debugPrint('Error loading saved API key: $e');
+      debugPrint('Error loading saved API key/templates: $e');
     }
   }
 
@@ -1017,6 +1021,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                       setState(() {
                         list.removeAt(index);
                       });
+                      saveTemplatesToStorage();
                     },
                   ),
                 ),
@@ -1535,6 +1540,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                         videoTemplatesList.add(newTemplate);
                       }
                     });
+                    saveTemplatesToStorage();
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -4437,6 +4443,88 @@ class VipTemplate {
     this.coverImagePath,
     this.coverImageBytes,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'gradientColors': gradientColors.map((c) => c.value).toList(),
+      'icon': icon.codePoint,
+      'shimmerColor': shimmerColor.value,
+      'isAi': isAi,
+      'prompt': prompt,
+      'promptImagePaths': promptImagePaths,
+      'promptImageBytes': promptImageBytes?.map((b) => base64Encode(b)).toList(),
+      'resultImagePath': resultImagePath,
+      'coverImagePath': coverImagePath,
+      'coverImageBytes': coverImageBytes != null ? base64Encode(coverImageBytes!) : null,
+    };
+  }
+
+  factory VipTemplate.fromJson(Map<String, dynamic> json) {
+    List<Color> colors = [];
+    if (json['gradientColors'] != null) {
+      colors = (json['gradientColors'] as List).map((v) => Color(v as int)).toList();
+    } else {
+      colors = [const Color(0xFFCF9E42), const Color(0xFF966C25)];
+    }
+
+    List<Uint8List>? pBytes;
+    if (json['promptImageBytes'] != null) {
+      pBytes = (json['promptImageBytes'] as List).map((s) => base64Decode(s as String)).toList();
+    }
+
+    final int iconCode = json['icon'] ?? 0;
+    IconData iconData = Icons.auto_awesome_rounded;
+    if (iconCode == Icons.flash_on_rounded.codePoint) iconData = Icons.flash_on_rounded;
+    else if (iconCode == Icons.workspace_premium_rounded.codePoint) iconData = Icons.workspace_premium_rounded;
+    else if (iconCode == Icons.camera_roll_rounded.codePoint) iconData = Icons.camera_roll_rounded;
+    else if (iconCode == Icons.zoom_in_rounded.codePoint) iconData = Icons.zoom_in_rounded;
+    else if (iconCode == Icons.face_rounded.codePoint) iconData = Icons.face_rounded;
+
+    return VipTemplate(
+      name: json['name'] ?? '',
+      gradientColors: colors,
+      icon: iconData,
+      shimmerColor: Color(json['shimmerColor'] ?? 0xFFCF9E42),
+      isAi: json['isAi'] ?? false,
+      prompt: json['prompt'],
+      promptImagePaths: json['promptImagePaths'] != null ? List<String>.from(json['promptImagePaths']) : null,
+      promptImageBytes: pBytes,
+      resultImagePath: json['resultImagePath'],
+      coverImagePath: json['coverImagePath'],
+      coverImageBytes: json['coverImageBytes'] != null ? base64Decode(json['coverImageBytes']) : null,
+    );
+  }
+}
+
+Future<void> saveTemplatesToStorage() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final photoJson = jsonEncode(photoTemplatesList.map((t) => t.toJson()).toList());
+    final videoJson = jsonEncode(videoTemplatesList.map((t) => t.toJson()).toList());
+    await prefs.setString('trendum_photo_templates', photoJson);
+    await prefs.setString('trendum_video_templates', videoJson);
+  } catch (e) {
+    debugPrint('Error saving templates: $e');
+  }
+}
+
+Future<void> loadTemplatesFromStorage() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final String? photoJson = prefs.getString('trendum_photo_templates');
+    final String? videoJson = prefs.getString('trendum_video_templates');
+    if (photoJson != null && photoJson.isNotEmpty) {
+      final List decoded = jsonDecode(photoJson);
+      photoTemplatesList = decoded.map((j) => VipTemplate.fromJson(j as Map<String, dynamic>)).toList();
+    }
+    if (videoJson != null && videoJson.isNotEmpty) {
+      final List decoded = jsonDecode(videoJson);
+      videoTemplatesList = decoded.map((j) => VipTemplate.fromJson(j as Map<String, dynamic>)).toList();
+    }
+  } catch (e) {
+    debugPrint('Error loading templates: $e');
+  }
 }
 
 class VipGame {
