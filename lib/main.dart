@@ -1192,22 +1192,19 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                           allowMultiple: false,
                           withData: true,
                         );
-                        if (result != null) {
+                        if (result != null && result.files.isNotEmpty) {
                           final file = result.files.single;
-                          if (kIsWeb) {
-                            if (file.bytes != null) {
-                              setDialogState(() {
-                                selectedCoverBytes = file.bytes;
-                                selectedCoverPath = null;
-                              });
-                            }
-                          } else {
-                            if (file.path != null) {
-                              setDialogState(() {
-                                selectedCoverPath = file.path;
-                                selectedCoverBytes = null;
-                              });
-                            }
+                          if (file.bytes != null && file.bytes!.isNotEmpty) {
+                            final compressed = await compressImageBytes(file.bytes!, targetWidth: 500);
+                            setDialogState(() {
+                              selectedCoverBytes = compressed;
+                              selectedCoverPath = file.path;
+                            });
+                          } else if (file.path != null) {
+                            setDialogState(() {
+                              selectedCoverPath = file.path;
+                              selectedCoverBytes = null;
+                            });
                           }
                         }
                       },
@@ -1404,7 +1401,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                     if (result != null && result.files.isNotEmpty) {
                                       final file = result.files.single;
                                       if (file.bytes != null && file.bytes!.isNotEmpty) {
-                                        setDialogState(() => selectedPromptBytes.add(file.bytes!));
+                                        final compressed = await compressImageBytes(file.bytes!, targetWidth: 400);
+                                        setDialogState(() => selectedPromptBytes.add(compressed));
                                       }
                                       if (file.path != null && file.path!.isNotEmpty) {
                                         setDialogState(() => selectedPromptPaths.add(file.path!));
@@ -4495,6 +4493,21 @@ class VipTemplate {
       coverImageBytes: json['coverImageBytes'] != null ? base64Decode(json['coverImageBytes']) : null,
     );
   }
+}
+
+Future<Uint8List> compressImageBytes(Uint8List bytes, {int targetWidth = 400}) async {
+  try {
+    if (bytes.length < 150 * 1024) return bytes;
+    final codec = await instantiateImageCodec(bytes, targetWidth: targetWidth);
+    final frame = await codec.getNextFrame();
+    final data = await frame.image.toByteData(format: ImageByteFormat.png);
+    if (data != null) {
+      return data.buffer.asUint8List();
+    }
+  } catch (e) {
+    debugPrint('Error compressing image: $e');
+  }
+  return bytes;
 }
 
 const String supabaseUrl = 'https://jyxswnwzwpitaiwxffuo.supabase.co';
