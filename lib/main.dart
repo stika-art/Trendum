@@ -785,7 +785,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
             style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'monospace'),
             obscureText: true,
             decoration: InputDecoration(
-              hintText: 'sk-xxxxxxxxxxxxxxxxxxxxxxxx',
+              hintText: 'Вставьте ваш ключ KIE.AI (например: fde11cd9...)',
               hintStyle: const TextStyle(color: Colors.white30),
               enabledBorder: OutlineInputBorder(
                 borderSide: BorderSide(color: Colors.white24),
