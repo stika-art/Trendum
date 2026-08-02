@@ -1142,6 +1142,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   void _showAddTemplateDialog(bool isPhoto) {
     final TextEditingController nameCtrl = TextEditingController();
     final TextEditingController promptCtrl = TextEditingController();
+    final TextEditingController instructionCtrl = TextEditingController();
     String? selectedCoverPath;      // для натива (Windows)
     Uint8List? selectedCoverBytes;  // для веба
     List<String> selectedPromptPaths = [];      // для натива
@@ -1176,6 +1177,19 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                       style: const TextStyle(color: Colors.white),
                       decoration: const InputDecoration(
                         hintText: 'Введите название',
+                        hintStyle: TextStyle(color: Colors.white30),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFCF9E42))),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('Инструкция для поп-апа (перед съёмкой):', style: TextStyle(color: Colors.white70)),
+                    TextField(
+                      controller: instructionCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        hintText: 'Например: Встаньте по центру кадра и улыбнитесь!',
                         hintStyle: TextStyle(color: Colors.white30),
                         enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
                         focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFCF9E42))),
@@ -1526,6 +1540,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                         shimmerColor: preset['glow'] as Color,
                         isAi: isAiSelected,
                         prompt: isAiSelected ? promptCtrl.text : null,
+                        instructionText: instructionCtrl.text.trim().isNotEmpty ? instructionCtrl.text.trim() : null,
                         promptImagePaths: selectedPromptPaths.isNotEmpty ? List.from(selectedPromptPaths) : null,
                         promptImageBytes: selectedPromptBytes.isNotEmpty ? List.from(selectedPromptBytes) : null,
                         resultImagePath: isAiSelected ? 'pennywise_ai_result.png' : null,
@@ -2376,17 +2391,114 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
                 childAspectRatio: 9 / 16,
                 children: templates.map((tmpl) => _PremiumTemplateCard(
                   template: tmpl,
-                  onTap: () => setState(() {
-                    _selectedItemName = tmpl.name;
-                    _selectedTemplate = tmpl;
-                    _pageState = TrendsPageState.shooting;
-                  }),
+                  onTap: () {
+                    setState(() {
+                      _selectedItemName = tmpl.name;
+                      _selectedTemplate = tmpl;
+                      _pageState = TrendsPageState.shooting;
+                    });
+                    _showTemplateInstructionDialog(tmpl);
+                  },
                 )).toList(),
               );
             },
           ),
         ),
       ],
+    );
+  }
+
+  void _showTemplateInstructionDialog(VipTemplate template) {
+    final String text = (template.instructionText != null && template.instructionText!.trim().isNotEmpty)
+        ? template.instructionText!
+        : 'Встаньте по центру кадра, смотрите в камеру и приготовьтесь к съёмке!';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: isKioskMode ? 500 : 340,
+            padding: EdgeInsets.all(isKioskMode ? 32 : 24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF14141A),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFCF9E42), width: 1.5),
+              boxShadow: const [
+                BoxShadow(color: Color(0x66CF9E42), blurRadius: 25, spreadRadius: 2),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LuxuryColors.goldGradient,
+                    boxShadow: [
+                      BoxShadow(color: Color(0x88CF9E42), blurRadius: 15),
+                    ],
+                  ),
+                  child: const Icon(Icons.info_outline_rounded, color: Colors.black, size: 30),
+                ),
+                const SizedBox(height: 16),
+                ShaderMask(
+                  shaderCallback: (bounds) => LuxuryColors.goldTextGradient.createShader(bounds),
+                  child: Text(
+                    'ИНСТРУКЦИЯ',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: isKioskMode ? 20 : 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  template.name,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Text(
+                    text,
+                    style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      backgroundColor: const Color(0xFFCF9E42),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Понятно, начать съёмку',
+                      style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -4411,6 +4523,7 @@ class VipTemplate {
   Color shimmerColor;
   bool isAi;
   String? prompt;
+  String? instructionText; // Инструкция для поп-апа перед съёмкой
   List<String>? promptImagePaths;    // Пути до 3 референс-фото (натив)
   List<Uint8List>? promptImageBytes; // Байты до 3 референс-фото (веб)
   String? resultImagePath;
@@ -4424,6 +4537,7 @@ class VipTemplate {
     required this.shimmerColor,
     this.isAi = false,
     this.prompt,
+    this.instructionText,
     this.promptImagePaths,
     this.promptImageBytes,
     this.resultImagePath,
@@ -4439,6 +4553,7 @@ class VipTemplate {
       'shimmerColor': shimmerColor.value,
       'isAi': isAi,
       'prompt': prompt,
+      'instructionText': instructionText,
       'promptImagePaths': promptImagePaths,
       'promptImageBytes': promptImageBytes?.map((b) => base64Encode(b)).toList(),
       'resultImagePath': resultImagePath,
@@ -4475,6 +4590,7 @@ class VipTemplate {
       shimmerColor: Color(json['shimmerColor'] ?? 0xFFCF9E42),
       isAi: json['isAi'] ?? false,
       prompt: json['prompt'],
+      instructionText: json['instructionText'],
       promptImagePaths: json['promptImagePaths'] != null ? List<String>.from(json['promptImagePaths']) : null,
       promptImageBytes: pBytes,
       resultImagePath: json['resultImagePath'],
