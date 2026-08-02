@@ -1937,7 +1937,7 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
 
   // Запуск записи видео (для трендов/видео)
   void _startRecording() {
-    const int durationMs = 4000; // 4 секунды симуляции записи
+    final int durationMs = _timerDuration * 1000; // 5, 8 или 10 секунд
     const int stepMs = 50;
     int elapsed = 0;
     
@@ -1992,7 +1992,7 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
         };
         if (isVideo) {
           inputPayload['resolution'] = '1080P';
-          inputPayload['duration'] = '10s';
+          inputPayload['duration'] = '${_timerDuration}s';
         }
         final response = await http.post(
           Uri.parse('https://api.kie.ai/api/v1/jobs/createTask'),
@@ -2628,13 +2628,13 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
                   right: 0,
                   child: Column(
                     children: [
-                      // Настраиваемый таймер (только для трендов и до начала съёмки)
-                      if (isTrends && _countdownValue == 0 && !_isRecording)
+                      // Настраиваемый таймер записи (5, 8, 10 секунд)
+                      if (_countdownValue == 0 && !_isRecording)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 16.0),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: [3, 5, 8, 10].map((sec) {
+                            children: [5, 8, 10].map((sec) {
                               final bool isSel = _timerDuration == sec;
                               return Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 6.0),
@@ -2672,87 +2672,36 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
                           ),
                         ),
 
-                      // Кнопка пуска камеры
+                      // Кнопка пуска записи / камеры
                       if (_countdownValue == 0 && !_isRecording)
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                if (isTrends) {
-                                  _startCountdown();
-                                } else if (isVideo) {
-                                  setState(() {
-                                    _isRecording = true;
-                                    _recordingProgress = 0.0;
-                                  });
-                                  _startRecording();
-                                } else {
-                                  _startProcessing();
-                                }
-                              },
-                              child: Container(
-                                width: isKioskMode ? 96 : 64,
-                                height: isKioskMode ? 96 : 64,
-                                decoration: BoxDecoration(
-                                  color: isVideo ? Colors.red : Colors.white,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: isKioskMode ? 6.0 : 4.0,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: isVideo ? Colors.red.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.3),
-                                      blurRadius: 15,
-                                      spreadRadius: 2,
-                                    ),
-                                  ],
-                                ),
-                                child: Icon(
-                                  isVideo ? Icons.fiber_manual_record : Icons.camera_alt_rounded,
-                                  color: isVideo ? Colors.red : Colors.black,
-                                  size: isKioskMode ? 44 : 28,
-                                ),
+                        GestureDetector(
+                          onTap: () {
+                            _startCountdown();
+                          },
+                          child: Container(
+                            width: isKioskMode ? 96 : 64,
+                            height: isKioskMode ? 96 : 64,
+                            decoration: BoxDecoration(
+                              color: isVideo ? Colors.red : Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: isKioskMode ? 6.0 : 4.0,
                               ),
-                            ),
-                            const SizedBox(height: 14),
-                            GestureDetector(
-                              onTap: () async {
-                                try {
-                                  final result = await FilePicker.platform.pickFiles(
-                                    type: FileType.media,
-                                    allowMultiple: false,
-                                    withData: true,
-                                  );
-                                  if (result != null && result.files.isNotEmpty) {
-                                    _startProcessing();
-                                  }
-                                } catch (e) {
-                                  debugPrint('Error picking file from gallery: $e');
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.white24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: isVideo ? Colors.red.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.3),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.photo_library_rounded, color: Color(0xFFF5DA8A), size: 16),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      isVideo ? 'Загрузить видео из галереи' : 'Загрузить фото из галереи',
-                                      style: const TextStyle(color: Colors.white70, fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              ],
                             ),
-                          ],
+                            child: Icon(
+                              isVideo ? Icons.fiber_manual_record : Icons.camera_alt_rounded,
+                              color: isVideo ? Colors.red : Colors.black,
+                              size: isKioskMode ? 44 : 28,
+                            ),
+                          ),
                         ),
                     ],
                   ),
