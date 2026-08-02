@@ -2062,8 +2062,9 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
       } else if (aiApiProvider == 'Nano Banana Pro') {
         final String modelName = isVideo ? 'gemini-omni-video' : 'nano-banana-2';
         debugPrint('[AI Banana] Sending task request to Kie.ai (model: $modelName)...');
+        final String focusedPrompt = '$prompt. Focus strictly on the primary person in the exact center foreground. Ignore background crowd and people behind.';
         final Map<String, dynamic> inputPayload = {
-          'prompt': prompt,
+          'prompt': focusedPrompt,
         };
         if (isVideo) {
           inputPayload['resolution'] = '1080P';
@@ -2729,6 +2730,49 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
                               ),
                             ),
                           ),
+                  ),
+                ),
+
+                // Овал-ориентир фокусировки лица по центру кадра
+                Positioned.fill(
+                  child: Center(
+                    child: IgnorePointer(
+                      child: Container(
+                        width: isKioskMode ? 260 : 180,
+                        height: isKioskMode ? 360 : 250,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.all(Radius.elliptical(isKioskMode ? 130 : 90, isKioskMode ? 180 : 125)),
+                          border: Border.all(
+                            color: const Color(0xFFCF9E42).withValues(alpha: 0.6),
+                            width: 2.0,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFCF9E42).withValues(alpha: 0.15),
+                              blurRadius: 15,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 12.0),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                'Поместите лицо сюда',
+                                style: TextStyle(color: Color(0xFFF5DA8A), fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
 
