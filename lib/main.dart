@@ -2062,7 +2062,7 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
       } else if (aiApiProvider == 'Nano Banana Pro') {
         final String modelName = isVideo ? 'gemini-omni-video' : 'nano-banana-2';
         debugPrint('[AI Banana] Sending task request to Kie.ai (model: $modelName)...');
-        final String focusedPrompt = '$prompt. Focus strictly on the primary person in the exact center foreground. Ignore background crowd and people behind.';
+        final String focusedPrompt = '$prompt. Full body 9:16 vertical shot. Focus strictly on the primary full-height standing person in the exact center foreground. Ignore background crowd and people behind.';
         final Map<String, dynamic> inputPayload = {
           'prompt': focusedPrompt,
         };
@@ -2733,43 +2733,58 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
                   ),
                 ),
 
-                // Овал-ориентир фокусировки лица по центру кадра
+                // Контур-ориентир человека в полный рост (9:16) по центру кадра
                 Positioned.fill(
                   child: Center(
                     child: IgnorePointer(
                       child: Container(
-                        width: isKioskMode ? 260 : 180,
-                        height: isKioskMode ? 360 : 250,
+                        width: isKioskMode ? 320 : 220,
+                        height: isKioskMode ? 560 : 380,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.all(Radius.elliptical(isKioskMode ? 130 : 90, isKioskMode ? 180 : 125)),
+                          borderRadius: BorderRadius.circular(24),
                           border: Border.all(
-                            color: const Color(0xFFCF9E42).withValues(alpha: 0.6),
+                            color: const Color(0xFFCF9E42).withValues(alpha: 0.5),
                             width: 2.0,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFCF9E42).withValues(alpha: 0.15),
-                              blurRadius: 15,
+                              color: const Color(0xFFCF9E42).withValues(alpha: 0.1),
+                              blurRadius: 20,
                               spreadRadius: 2,
                             ),
                           ],
                         ),
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 12.0),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.6),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text(
-                                'Поместите лицо сюда',
-                                style: TextStyle(color: Color(0xFFF5DA8A), fontSize: 11, fontWeight: FontWeight.bold),
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 14.0),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.7),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFCF9E42).withValues(alpha: 0.3)),
+                                ),
+                                child: const Text(
+                                  'Встаньте в полный рост по центру',
+                                  style: TextStyle(color: Color(0xFFF5DA8A), fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
                               ),
                             ),
-                          ),
+                            const Spacer(),
+                            Opacity(
+                              opacity: 0.15,
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 20.0),
+                                child: Icon(
+                                  Icons.accessibility_new_rounded,
+                                  size: isKioskMode ? 260 : 180,
+                                  color: const Color(0xFFCF9E42),
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                          ],
                         ),
                       ),
                     ),
