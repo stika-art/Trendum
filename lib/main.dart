@@ -1143,6 +1143,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     final TextEditingController nameCtrl = TextEditingController();
     final TextEditingController promptCtrl = TextEditingController();
     final TextEditingController instructionCtrl = TextEditingController();
+    String? selectedInstructionMediaPath;
+    Uint8List? selectedInstructionMediaBytes;
     String? selectedCoverPath;      // для натива (Windows)
     Uint8List? selectedCoverBytes;  // для веба
     List<String> selectedPromptPaths = [];      // для натива
@@ -1193,6 +1195,61 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                         hintStyle: TextStyle(color: Colors.white30),
                         enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
                         focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFCF9E42))),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('Медиа-инструкция (Фото / GIF / Видео):', style: TextStyle(color: Colors.white70)),
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: () async {
+                        final result = await FilePicker.platform.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['png', 'jpg', 'jpeg', 'gif', 'mp4', 'mov'],
+                          allowMultiple: false,
+                          withData: true,
+                        );
+                        if (result != null && result.files.isNotEmpty) {
+                          final file = result.files.single;
+                          if (file.bytes != null && file.bytes!.isNotEmpty) {
+                            final compressed = await compressImageBytes(file.bytes!, targetWidth: 400);
+                            setDialogState(() {
+                              selectedInstructionMediaBytes = compressed;
+                              selectedInstructionMediaPath = file.path;
+                            });
+                          } else if (file.path != null) {
+                            setDialogState(() {
+                              selectedInstructionMediaPath = file.path;
+                              selectedInstructionMediaBytes = null;
+                            });
+                          }
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.perm_media_rounded, color: Color(0xFFF5DA8A), size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                (selectedInstructionMediaBytes != null || selectedInstructionMediaPath != null)
+                                    ? '✅ Медиа выбрано'
+                                    : 'Выбрать фото, GIF или видео...',
+                                style: TextStyle(
+                                  color: (selectedInstructionMediaBytes != null || selectedInstructionMediaPath != null)
+                                      ? const Color(0xFFF5DA8A)
+                                      : Colors.white54,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1541,6 +1598,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                         isAi: isAiSelected,
                         prompt: isAiSelected ? promptCtrl.text : null,
                         instructionText: instructionCtrl.text.trim().isNotEmpty ? instructionCtrl.text.trim() : null,
+                        instructionMediaPath: selectedInstructionMediaPath,
+                        instructionMediaBytes: selectedInstructionMediaBytes,
                         promptImagePaths: selectedPromptPaths.isNotEmpty ? List.from(selectedPromptPaths) : null,
                         promptImageBytes: selectedPromptBytes.isNotEmpty ? List.from(selectedPromptBytes) : null,
                         resultImagePath: isAiSelected ? 'pennywise_ai_result.png' : null,
@@ -2465,6 +2524,27 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
+                if (template.instructionMediaBytes != null || (template.instructionMediaPath != null && template.instructionMediaPath!.isNotEmpty))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14.0),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        height: 180,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.black,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFCF9E42).withValues(alpha: 0.3)),
+                        ),
+                        child: (template.instructionMediaPath != null && (template.instructionMediaPath!.endsWith('.mp4') || template.instructionMediaPath!.endsWith('.mov')))
+                            ? LoopingVideoCover(videoPath: template.instructionMediaPath!)
+                            : (template.instructionMediaBytes != null)
+                                ? Image.memory(template.instructionMediaBytes!, fit: BoxFit.contain)
+                                : Image.file(File(template.instructionMediaPath!), fit: BoxFit.contain),
+                      ),
+                    ),
+                  ),
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -4524,6 +4604,8 @@ class VipTemplate {
   bool isAi;
   String? prompt;
   String? instructionText; // Инструкция для поп-апа перед съёмкой
+  String? instructionMediaPath;      // Путь к медиа-инструкции (фото/GIF/видео)
+  Uint8List? instructionMediaBytes;  // Байты медиа-инструкции (веб)
   List<String>? promptImagePaths;    // Пути до 3 референс-фото (натив)
   List<Uint8List>? promptImageBytes; // Байты до 3 референс-фото (веб)
   String? resultImagePath;
@@ -4538,6 +4620,8 @@ class VipTemplate {
     this.isAi = false,
     this.prompt,
     this.instructionText,
+    this.instructionMediaPath,
+    this.instructionMediaBytes,
     this.promptImagePaths,
     this.promptImageBytes,
     this.resultImagePath,
@@ -4554,6 +4638,8 @@ class VipTemplate {
       'isAi': isAi,
       'prompt': prompt,
       'instructionText': instructionText,
+      'instructionMediaPath': instructionMediaPath,
+      'instructionMediaBytes': instructionMediaBytes != null ? base64Encode(instructionMediaBytes!) : null,
       'promptImagePaths': promptImagePaths,
       'promptImageBytes': promptImageBytes?.map((b) => base64Encode(b)).toList(),
       'resultImagePath': resultImagePath,
@@ -4591,6 +4677,8 @@ class VipTemplate {
       isAi: json['isAi'] ?? false,
       prompt: json['prompt'],
       instructionText: json['instructionText'],
+      instructionMediaPath: json['instructionMediaPath'],
+      instructionMediaBytes: json['instructionMediaBytes'] != null ? base64Decode(json['instructionMediaBytes']) : null,
       promptImagePaths: json['promptImagePaths'] != null ? List<String>.from(json['promptImagePaths']) : null,
       promptImageBytes: pBytes,
       resultImagePath: json['resultImagePath'],
