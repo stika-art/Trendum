@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'web_camera_stub.dart' if (dart.library.html) 'web_camera.dart';
 
 // Виджет для фонового зацикленного видео
 class LoopingVideoCover extends StatefulWidget {
@@ -2456,7 +2457,9 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
                       _selectedTemplate = tmpl;
                       _pageState = TrendsPageState.shooting;
                     });
-                    _showTemplateInstructionDialog(tmpl);
+                    Future.microtask(() {
+                      _showTemplateInstructionDialog(tmpl);
+                    });
                   },
                 )).toList(),
               );
@@ -2714,16 +2717,18 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
                         radius: 1.2,
                       ),
                     ),
-                    child: Center(
-                      child: Opacity(
-                        opacity: 0.15,
-                        child: Icon(
-                          Icons.person_outline_rounded,
-                          size: isKioskMode ? 280 : 150,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+                    child: kIsWeb
+                        ? getWebCameraView()
+                        : Center(
+                            child: Opacity(
+                              opacity: 0.15,
+                              child: Icon(
+                                Icons.person_outline_rounded,
+                                size: isKioskMode ? 280 : 150,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
                   ),
                 ),
 
