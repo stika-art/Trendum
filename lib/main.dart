@@ -2518,12 +2518,16 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
     final bool isPhoto = _selectedCategory == 'фото';
     final List<VipTemplate> templates = isPhoto ? photoTemplatesList : videoTemplatesList;
 
+    if (isLoadingTemplates && templates.isNotEmpty) {
+      isLoadingTemplates = false;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildStepHeader(isPhoto ? 'Шаблоны Фото' : 'Шаблоны Видео', _resetToCategories),
         Expanded(
-          child: isLoadingTemplates
+          child: (isLoadingTemplates && templates.isEmpty)
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
