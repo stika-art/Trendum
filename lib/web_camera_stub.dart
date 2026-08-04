@@ -5,3 +5,6 @@ Widget getWebCameraView() {
     child: Icon(Icons.videocam_rounded, size: 80, color: Colors.white24),
   );
 }
+
+/// Заглушка для не-веб платформ
+String? captureCurrentFrame() => null;

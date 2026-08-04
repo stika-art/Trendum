@@ -1955,6 +1955,7 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
   String _processingStepText = '';
   String? _generatedImageUrl;
   bool _isAiGenerating = false;
+  String? _capturedPhotoBase64; // Фото с камеры для передачи в ИИ
   bool _phoneConnected = false;
   int _countdownValue = 0;
   bool _isRecording = false;
@@ -2039,6 +2040,9 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
           _startRecording();
         } else {
           // Для Фото шаблонов: мгновенный снимок (вспышка затвора) и сразу к обработке
+          // Захватываем кадр с камеры ПЕРЕД вспышкой
+          _capturedPhotoBase64 = captureCurrentFrame();
+          debugPrint('[Camera] Captured frame: ${_capturedPhotoBase64 != null ? "OK (${_capturedPhotoBase64!.length} chars)" : "FAIL"}');
           setState(() {
             _countdownValue = 0;
             _isRecording = false;
@@ -2082,7 +2086,7 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
     });
   }
 
-  Future<String?> _generateAiImage(String prompt, {bool isVideo = false}) async {
+  Future<String?> _generateAiImage(String prompt, {bool isVideo = false, String? photoBase64}) async {
     if (aiApiKey.isEmpty && aiApiProvider != 'Custom') {
       debugPrint('[AI Banana] API key is empty. Using simulated fallback image.');
       await Future.delayed(const Duration(milliseconds: 1500));
@@ -2115,6 +2119,11 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
         final Map<String, dynamic> inputPayload = {
           'prompt': focusedPrompt,
         };
+        // Добавляем фото пользователя с камеры если есть
+        if (photoBase64 != null && photoBase64.isNotEmpty) {
+          inputPayload['imageUrls'] = [photoBase64];
+          debugPrint('[AI Banana] Including user camera photo in request.');
+        }
         if (isVideo) {
           inputPayload['resolution'] = '1080P';
           inputPayload['duration'] = '${_timerDuration}s';
@@ -2159,7 +2168,19 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
                     }
                   }
                   if (imageUrl != null && imageUrl.isNotEmpty) {
-                    debugPrint('[AI Banana] Nano Banana Pro success: $imageUrl');
+                    debugPrint('[AI Banana] Nano Banana Pro success URL: $imageUrl');
+                    // CORS-фикс: скачиваем изображение и возвращаем как data URL
+                    try {
+                      final imgRes = await http.get(Uri.parse(imageUrl));
+                      if (imgRes.statusCode == 200) {
+                        final bytes = imgRes.bodyBytes;
+                        final contentType = imgRes.headers['content-type'] ?? 'image/jpeg';
+                        final base64Str = base64Encode(bytes);
+                        return 'data:$contentType;base64,$base64Str';
+                      }
+                    } catch (e) {
+                      debugPrint('[AI Banana] Could not fetch image bytes, using URL directly: $e');
+                    }
                     return imageUrl;
                   }
                 } else if (status == 'fail' || status == 'failed' || status == 'error') {
@@ -2259,7 +2280,8 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
     });
 
     if (isAi && _selectedTemplate?.prompt != null) {
-      _generateAiImage(_selectedTemplate!.prompt!, isVideo: isVideo).then((url) {
+      final String? photo = _capturedPhotoBase64;
+      _generateAiImage(_selectedTemplate!.prompt!, isVideo: isVideo, photoBase64: photo).then((url) {
         if (mounted) {
           setState(() {
             _generatedImageUrl = url;
