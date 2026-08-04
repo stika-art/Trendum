@@ -1964,6 +1964,20 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
   String? _generatedImageUrl;
   bool _isAiGenerating = false;
   String? _capturedPhotoBase64; // Фото с камеры для передачи в ИИ
+  bool _isFetchingTemplatesFromCloud = false;
+
+  Future<void> _fetchTemplatesFromCloud() async {
+    if (_isFetchingTemplatesFromCloud) return;
+    _isFetchingTemplatesFromCloud = true;
+    try {
+      await loadTemplatesFromStorage();
+      if (mounted) {
+        setState(() {});
+      }
+    } finally {
+      _isFetchingTemplatesFromCloud = false;
+    }
+  }
   bool _phoneConnected = false;
   int _countdownValue = 0;
   bool _isRecording = false;
@@ -2518,6 +2532,10 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
     final bool isPhoto = _selectedCategory == 'фото';
     final List<VipTemplate> templates = isPhoto ? photoTemplatesList : videoTemplatesList;
 
+    if (templates.isEmpty && !_isFetchingTemplatesFromCloud) {
+      _fetchTemplatesFromCloud();
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2532,7 +2550,21 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
                       const SizedBox(height: 16),
                       const Text('Шаблонов пока нет', style: TextStyle(color: Colors.white38, fontSize: 16)),
                       const SizedBox(height: 8),
-                      const Text('Добавьте шаблоны в панели администратора', style: TextStyle(color: Colors.white24, fontSize: 12)),
+                      const Text('Добавьте шаблоны в панели администратора или обновите из облака', style: TextStyle(color: Colors.white24, fontSize: 12)),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFCF9E42),
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          _fetchTemplatesFromCloud();
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Обновить из облака', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
                     ],
                   ),
                 )
@@ -5043,12 +5075,25 @@ Future<void> loadTemplatesFromStorage() async {
         'apikey': supabaseAnonKey,
         'Authorization': 'Bearer $supabaseAnonKey',
       },
-    ).timeout(const Duration(seconds: 4));
+    ).timeout(const Duration(seconds: 5));
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
       for (final row in data) {
-        if (row['key'] == 'photo_templates' && row['value'] != null) {
-          final List decoded = jsonDecode(row['value']);
+        final String key = (row['key'] ?? '').toString();
+        final dynamic rawVal = row['value'];
+        if (rawVal == null) continue;
+
+        String jsonStr = '';
+        if (rawVal is String) {
+          jsonStr = rawVal;
+        } else {
+          jsonStr = jsonEncode(rawVal);
+        }
+
+        if (jsonStr.isEmpty || jsonStr == '[]') continue;
+
+        try {
+          final List decoded = jsonDecode(jsonStr);
           final loadedList = <VipTemplate>[];
           for (final j in decoded) {
             try {
@@ -5056,23 +5101,16 @@ Future<void> loadTemplatesFromStorage() async {
                 loadedList.add(VipTemplate.fromJson(Map<String, dynamic>.from(j)));
               }
             } catch (e, st) {
-              debugPrint('Error parsing photo template item: $e\n$st');
+              debugPrint('Error parsing $key item: $e\n$st');
             }
           }
-          photoTemplatesList = loadedList;
-        } else if (row['key'] == 'video_templates' && row['value'] != null) {
-          final List decoded = jsonDecode(row['value']);
-          final loadedList = <VipTemplate>[];
-          for (final j in decoded) {
-            try {
-              if (j is Map) {
-                loadedList.add(VipTemplate.fromJson(Map<String, dynamic>.from(j)));
-              }
-            } catch (e, st) {
-              debugPrint('Error parsing video template item: $e\n$st');
-            }
+          if (key == 'photo_templates') {
+            photoTemplatesList = loadedList;
+          } else if (key == 'video_templates') {
+            videoTemplatesList = loadedList;
           }
-          videoTemplatesList = loadedList;
+        } catch (e) {
+          debugPrint('Error decoding JSON for $key: $e');
         }
       }
       debugPrint('Templates loaded from Supabase: photo=${photoTemplatesList.length}, video=${videoTemplatesList.length}');
