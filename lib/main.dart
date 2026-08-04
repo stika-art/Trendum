@@ -320,14 +320,13 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
   Future<void> _loadSavedApiKey() async {
     try {
-      // Загрузка API-ключа из Supabase
       final res = await http.get(
         Uri.parse('$supabaseUrl/rest/v1/app_storage?key=eq.ai_api_key&select=*'),
         headers: {
           'apikey': supabaseAnonKey,
           'Authorization': 'Bearer $supabaseAnonKey',
         },
-      );
+      ).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final List data = jsonDecode(res.body);
         if (data.isNotEmpty && data[0]['value'] != null) {
@@ -345,10 +344,15 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       debugPrint('Error loading API key from Supabase: $e');
     }
 
-    await loadTemplatesFromStorage();
-    isLoadingTemplates = false;
-    if (mounted) {
-      setState(() {});
+    try {
+      await loadTemplatesFromStorage().timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('Error or timeout loading templates: $e');
+    } finally {
+      isLoadingTemplates = false;
+      if (mounted) {
+        setState(() {});
+      }
     }
   }
 
@@ -5034,7 +5038,7 @@ Future<void> loadTemplatesFromStorage() async {
         'apikey': supabaseAnonKey,
         'Authorization': 'Bearer $supabaseAnonKey',
       },
-    );
+    ).timeout(const Duration(seconds: 4));
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
       for (final row in data) {
@@ -5052,6 +5056,21 @@ Future<void> loadTemplatesFromStorage() async {
     }
   } catch (e) {
     debugPrint('Error loading templates from Supabase: $e');
+  }
+
+  // Если список шаблонов пуст, инициализируем базовыми шаблонами по умолчанию
+  if (photoTemplatesList.isEmpty) {
+    photoTemplatesList = [
+      VipTemplate(
+        name: 'Pennywise',
+        gradientColors: [const Color(0xFFCF9E42), const Color(0xFF966C25)],
+        icon: Icons.face_rounded,
+        shimmerColor: const Color(0xFFCF9E42),
+        isAi: true,
+        prompt: 'Добавь рядом со мной улыбающегося Пеннивайза',
+        instructionText: 'Встаньте по центру кадра и улыбнитесь!',
+      ),
+    ];
   }
 }
 
