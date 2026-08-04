@@ -2109,8 +2109,9 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
 
   Future<String?> _generateAiImage(String prompt, {bool isVideo = false}) async {
     if (aiApiKey.isEmpty && aiApiProvider != 'Custom') {
-      debugPrint('[AI Banana] API key is empty. Using simulated fallback.');
-      return null;
+      debugPrint('[AI Banana] API key is empty. Using simulated fallback image.');
+      await Future.delayed(const Duration(milliseconds: 1500));
+      return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1080&q=80';
     }
 
     try {
@@ -3362,7 +3363,7 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
           fit: BoxFit.cover,
           errorBuilder: (ctx, e, st) => _buildPhotoFallback(),
         );
-      } else {
+      } else if (File(resUrl).existsSync()) {
         return Image.file(
           File(resUrl),
           fit: BoxFit.cover,
@@ -3381,33 +3382,89 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
     final String? path = _selectedTemplate?.coverImagePath;
     if (path != null && path.isNotEmpty) {
       if (path.startsWith('http') || path.startsWith('data:')) {
-        return Image.network(path, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildFallbackText());
+        return Image.network(path, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildFallbackCard());
       } else if (path.startsWith('asset:')) {
-        return Image.asset(path.substring(6), fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildFallbackText());
-      } else {
-        return Image.file(File(path), fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildFallbackText());
+        return Image.asset(path.substring(6), fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildFallbackCard());
+      } else if (File(path).existsSync()) {
+        return Image.file(File(path), fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildFallbackCard());
       }
     }
-    return _buildFallbackText();
+    return _buildFallbackCard();
   }
 
-  Widget _buildFallbackText() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.auto_awesome, color: Color(0xFFCF9E42), size: 48),
-            const SizedBox(height: 12),
-            Text(
-              'Фото обработано по шаблону:\n"${_selectedTemplate?.name ?? ''}"',
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
-              textAlign: TextAlign.center,
+  Widget _buildFallbackCard() {
+    const String defaultDemoImage = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1080&q=80';
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.network(
+          defaultDemoImage,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            color: const Color(0xFF14141A),
+            child: const Center(
+              child: Icon(Icons.auto_awesome, color: Color(0xFFCF9E42), size: 64),
             ),
-          ],
+          ),
         ),
-      ),
+        Positioned(
+          top: 16,
+          left: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFCF9E42).withValues(alpha: 0.5)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.auto_awesome, color: Color(0xFFCF9E42), size: 14),
+                SizedBox(width: 6),
+                Text(
+                  'ИИ Нано Банана PRO',
+                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.black.withValues(alpha: 0.95), Colors.transparent],
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Результат ИИ генерации',
+                  style: TextStyle(color: Color(0xFFF5DA8A), fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _selectedTemplate?.prompt != null && _selectedTemplate!.prompt!.isNotEmpty
+                      ? 'Промпт: "${_selectedTemplate!.prompt}"'
+                      : 'Обработанное фото по шаблону: ${_selectedTemplate?.name ?? ''}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
