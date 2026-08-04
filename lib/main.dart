@@ -3334,6 +3334,10 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
         return Image.network(
           resUrl,
           fit: BoxFit.cover,
+          loadingBuilder: (ctx, child, progress) {
+            if (progress == null) return child;
+            return _buildImageLoadingSpinner();
+          },
           errorBuilder: (ctx, e, st) => _buildPhotoFallback(),
         );
       } else if (resUrl.startsWith('asset:')) {
@@ -3352,6 +3356,35 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
     }
 
     return _buildPhotoFallback();
+  }
+
+  Widget _buildImageLoadingSpinner() {
+    return Container(
+      color: const Color(0xFF0F081D),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: isKioskMode ? 64 : 48,
+              height: isKioskMode ? 64 : 48,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFFCF9E42)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Загрузка фото...',
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: isKioskMode ? 16 : 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildPhotoFallback() {
@@ -3379,6 +3412,10 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
         Image.network(
           defaultDemoImage,
           fit: BoxFit.cover,
+          loadingBuilder: (ctx, child, progress) {
+            if (progress == null) return child;
+            return _buildImageLoadingSpinner();
+          },
           errorBuilder: (_, __, ___) => Container(
             color: const Color(0xFF14141A),
             child: const Center(
