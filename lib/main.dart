@@ -2157,9 +2157,9 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
         );
         if (response.statusCode == 200 || response.statusCode == 201) {
           final data = jsonDecode(response.body);
-          final String? taskId = data['data']?['taskId'];
+          final String? taskId = data['data']?['taskId'] ?? data['taskId'];
           if (taskId != null) {
-            for (int i = 0; i < 8; i++) {
+            for (int i = 0; i < 12; i++) {
               await Future.delayed(const Duration(milliseconds: 1500));
               debugPrint('[AI Banana] Polling Nano Banana Pro task status (attempt ${i + 1})...');
               final checkRes = await http.get(
@@ -2170,21 +2170,25 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
               );
               if (checkRes.statusCode == 200) {
                 final checkData = jsonDecode(checkRes.body);
-                final String status = checkData['data']?['status'] ?? '';
-                if (status == 'success') {
-                  dynamic outputField = checkData['data']?['output'];
-                  String? imageUrl = checkData['data']?['result'] ?? checkData['data']?['imgUrl'];
+                final String status = (checkData['data']?['status'] ?? checkData['status'] ?? '').toString().toLowerCase();
+                if (status == 'success' || status == 'completed' || status == 'succeeded') {
+                  dynamic outputField = checkData['data']?['output'] ?? checkData['output'];
+                  String? imageUrl = checkData['data']?['result'] ?? checkData['data']?['imgUrl'] ?? checkData['result'];
                   if (imageUrl == null && outputField != null) {
                     if (outputField is List && outputField.isNotEmpty) {
                       imageUrl = outputField.first.toString();
+                    } else if (outputField is Map) {
+                      imageUrl = (outputField['result'] ?? outputField['url'] ?? outputField['image'] ?? outputField['imgUrl'])?.toString();
                     } else {
                       imageUrl = outputField.toString();
                     }
                   }
-                  debugPrint('[AI Banana] Nano Banana Pro success: $imageUrl');
-                  return imageUrl;
-                } else if (status == 'fail' || status == 'failed') {
-                  debugPrint('[AI Banana] Nano Banana Pro task failed');
+                  if (imageUrl != null && imageUrl.isNotEmpty) {
+                    debugPrint('[AI Banana] Nano Banana Pro success: $imageUrl');
+                    return imageUrl;
+                  }
+                } else if (status == 'fail' || status == 'failed' || status == 'error') {
+                  debugPrint('[AI Banana] Nano Banana Pro task failed with status: $status');
                   break;
                 }
               }
