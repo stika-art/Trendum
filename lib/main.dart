@@ -4949,7 +4949,10 @@ class VipTemplate {
   factory VipTemplate.fromJson(Map<String, dynamic> json) {
     List<Color> colors = [];
     if (json['gradientColors'] != null) {
-      colors = (json['gradientColors'] as List).map((v) => Color(v as int)).toList();
+      colors = (json['gradientColors'] as List).map((v) {
+        final int val = v is num ? v.toInt() : (int.tryParse(v.toString()) ?? 0xFFCF9E42);
+        return Color(val);
+      }).toList();
     } else {
       colors = [const Color(0xFFCF9E42), const Color(0xFF966C25)];
     }
@@ -4959,7 +4962,8 @@ class VipTemplate {
       pBytes = (json['promptImageBytes'] as List).map((s) => base64Decode(s as String)).toList();
     }
 
-    final int iconCode = json['icon'] ?? 0;
+    final dynamic rawIcon = json['icon'];
+    final int iconCode = rawIcon is num ? rawIcon.toInt() : (int.tryParse(rawIcon?.toString() ?? '') ?? 0);
     IconData iconData = Icons.auto_awesome_rounded;
     if (iconCode == Icons.flash_on_rounded.codePoint) iconData = Icons.flash_on_rounded;
     else if (iconCode == Icons.workspace_premium_rounded.codePoint) iconData = Icons.workspace_premium_rounded;
@@ -4967,11 +4971,14 @@ class VipTemplate {
     else if (iconCode == Icons.zoom_in_rounded.codePoint) iconData = Icons.zoom_in_rounded;
     else if (iconCode == Icons.face_rounded.codePoint) iconData = Icons.face_rounded;
 
+    final dynamic rawShimmer = json['shimmerColor'];
+    final int shimmerVal = rawShimmer is num ? rawShimmer.toInt() : (int.tryParse(rawShimmer?.toString() ?? '') ?? 0xFFCF9E42);
+
     return VipTemplate(
       name: json['name'] ?? '',
       gradientColors: colors,
       icon: iconData,
-      shimmerColor: Color(json['shimmerColor'] ?? 0xFFCF9E42),
+      shimmerColor: Color(shimmerVal),
       isAi: json['isAi'] ?? false,
       prompt: json['prompt'],
       instructionText: json['instructionText'],
@@ -5038,7 +5045,7 @@ Future<void> loadTemplatesFromStorage() async {
         'apikey': supabaseAnonKey,
         'Authorization': 'Bearer $supabaseAnonKey',
       },
-    ).timeout(const Duration(seconds: 4));
+    ).timeout(const Duration(seconds: 5));
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
       for (final row in data) {
@@ -5054,23 +5061,8 @@ Future<void> loadTemplatesFromStorage() async {
     } else {
       debugPrint('Supabase load failed: ${res.statusCode} ${res.body}');
     }
-  } catch (e) {
-    debugPrint('Error loading templates from Supabase: $e');
-  }
-
-  // Если список шаблонов пуст, инициализируем базовыми шаблонами по умолчанию
-  if (photoTemplatesList.isEmpty) {
-    photoTemplatesList = [
-      VipTemplate(
-        name: 'Pennywise',
-        gradientColors: [const Color(0xFFCF9E42), const Color(0xFF966C25)],
-        icon: Icons.face_rounded,
-        shimmerColor: const Color(0xFFCF9E42),
-        isAi: true,
-        prompt: 'Добавь рядом со мной улыбающегося Пеннивайза',
-        instructionText: 'Встаньте по центру кадра и улыбнитесь!',
-      ),
-    ];
+  } catch (e, st) {
+    debugPrint('Error loading templates from Supabase: $e\n$st');
   }
 }
 
