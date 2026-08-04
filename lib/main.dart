@@ -2053,12 +2053,23 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
         });
       } else {
         timer.cancel();
-        setState(() {
-          _countdownValue = 0;
-          _isRecording = true;
-          _recordingProgress = 0.0;
-        });
-        _startRecording();
+        final bool isVideo = _selectedCategory == 'видео' || _selectedCategory == 'тренды';
+        if (isVideo) {
+          setState(() {
+            _countdownValue = 0;
+            _isRecording = true;
+            _recordingProgress = 0.0;
+          });
+          _startRecording();
+        } else {
+          // Для Фото шаблонов: сразу после обратного отсчета делаем снимок и переходим к обработке
+          setState(() {
+            _countdownValue = 0;
+            _isRecording = false;
+            _pageState = TrendsPageState.processing;
+          });
+          _startProcessing();
+        }
       }
     });
   }
@@ -3204,7 +3215,7 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
 
   Widget _buildFinalResultView() {
     final bool isVideo = _selectedCategory == 'видео' || _selectedCategory == 'тренды';
-    final String? resUrl = _generatedImageUrl ?? _selectedTemplate?.resultImagePath;
+    final String? resUrl = _generatedImageUrl ?? _selectedTemplate?.resultImagePath ?? _selectedTemplate?.coverImagePath;
 
     if (isVideo) {
       return Container(
@@ -3347,6 +3358,23 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
   }
 
   Widget _buildPhotoFallback() {
+    if (_selectedTemplate?.coverImageBytes != null) {
+      return Image.memory(_selectedTemplate!.coverImageBytes!, fit: BoxFit.cover);
+    }
+    final String? path = _selectedTemplate?.coverImagePath;
+    if (path != null && path.isNotEmpty) {
+      if (path.startsWith('http') || path.startsWith('data:')) {
+        return Image.network(path, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildFallbackText());
+      } else if (path.startsWith('asset:')) {
+        return Image.asset(path.substring(6), fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildFallbackText());
+      } else {
+        return Image.file(File(path), fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildFallbackText());
+      }
+    }
+    return _buildFallbackText();
+  }
+
+  Widget _buildFallbackText() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -3356,7 +3384,7 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
             const Icon(Icons.auto_awesome, color: Color(0xFFCF9E42), size: 48),
             const SizedBox(height: 12),
             Text(
-              'Фото сгенерировано ИИ Нано Банана по промпту:\n"${_selectedTemplate?.prompt ?? ''}"',
+              'Фото обработано по шаблону:\n"${_selectedTemplate?.name ?? ''}"',
               style: const TextStyle(color: Colors.white70, fontSize: 13),
               textAlign: TextAlign.center,
             ),
