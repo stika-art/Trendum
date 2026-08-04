@@ -328,6 +328,40 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
           _apiKeyController.text = savedKey;
         });
       }
+
+      // Загрузка API-ключа из Supabase
+      try {
+        final res = await http.get(
+          Uri.parse('$supabaseUrl/rest/v1/app_storage?key=eq.ai_api_key&select=*'),
+          headers: {
+            'apikey': supabaseAnonKey,
+            'Authorization': 'Bearer $supabaseAnonKey',
+          },
+        );
+        if (res.statusCode == 200) {
+          final List data = jsonDecode(res.body);
+          if (data.isNotEmpty && data[0]['value'] != null) {
+            final String cloudKey = data[0]['value'].toString();
+            if (cloudKey.isNotEmpty) {
+              if (mounted) {
+                setState(() {
+                  aiApiKey = cloudKey;
+                  aiApiProvider = 'Nano Banana Pro';
+                  _apiKeyController.text = cloudKey;
+                });
+              } else {
+                aiApiKey = cloudKey;
+                aiApiProvider = 'Nano Banana Pro';
+                _apiKeyController.text = cloudKey;
+              }
+              await prefs.setString('trendum_ai_api_key', cloudKey);
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading API key from Supabase: $e');
+      }
+
       await loadTemplatesFromStorage();
       if (mounted) {
         setState(() {});
@@ -848,10 +882,29 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                 aiApiProvider = 'Nano Banana Pro';
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('trendum_ai_api_key', key);
+
+                // Сохранение API-ключа в Supabase app_storage
+                try {
+                  await http.post(
+                    Uri.parse('$supabaseUrl/rest/v1/app_storage'),
+                    headers: {
+                      'apikey': supabaseAnonKey,
+                      'Authorization': 'Bearer $supabaseAnonKey',
+                      'Content-Type': 'application/json',
+                      'Prefer': 'resolution=merge-duplicates',
+                    },
+                    body: jsonEncode([
+                      {'key': 'ai_api_key', 'value': key},
+                    ]),
+                  );
+                } catch (e) {
+                  debugPrint('Error saving API key to Supabase: $e');
+                }
+
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('✅ API-ключ KIE.AI успешно сохранён!'),
+                      content: Text('✅ API-ключ KIE.AI успешно сохранён (локально и в Supabase)!'),
                       backgroundColor: Color(0xFF4ade80),
                       duration: Duration(seconds: 2),
                     ),
