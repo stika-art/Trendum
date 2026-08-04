@@ -319,40 +319,9 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _loadSavedApiKey() async {
-    try {
-      final res = await http.get(
-        Uri.parse('$supabaseUrl/rest/v1/app_storage?key=eq.ai_api_key&select=*'),
-        headers: {
-          'apikey': supabaseAnonKey,
-          'Authorization': 'Bearer $supabaseAnonKey',
-        },
-      ).timeout(const Duration(seconds: 4));
-      if (res.statusCode == 200) {
-        final List data = jsonDecode(res.body);
-        if (data.isNotEmpty && data[0]['value'] != null) {
-          final String cloudKey = data[0]['value'].toString();
-          if (cloudKey.isNotEmpty && mounted) {
-            setState(() {
-              aiApiKey = cloudKey;
-              aiApiProvider = 'Nano Banana Pro';
-              _apiKeyController.text = cloudKey;
-            });
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading API key from Supabase: $e');
-    }
-
-    try {
-      await loadTemplatesFromStorage().timeout(const Duration(seconds: 5));
-    } catch (e) {
-      debugPrint('Error or timeout loading templates: $e');
-    } finally {
-      isLoadingTemplates = false;
-      if (mounted) {
-        setState(() {});
-      }
+    await loadTemplatesFromStorage();
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -5067,7 +5036,7 @@ Future<void> saveTemplatesToStorage() async {
 }
 
 Future<void> loadTemplatesFromStorage() async {
-  // Только Супабейс
+  // Загружаем ВСЕ данные (ключ + шаблоны) за один быстрый запрос в ~300мс
   try {
     final res = await http.get(
       Uri.parse('$supabaseUrl/rest/v1/app_storage?select=*'),
@@ -5075,7 +5044,8 @@ Future<void> loadTemplatesFromStorage() async {
         'apikey': supabaseAnonKey,
         'Authorization': 'Bearer $supabaseAnonKey',
       },
-    ).timeout(const Duration(seconds: 5));
+    ).timeout(const Duration(seconds: 4));
+
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
       for (final row in data) {
@@ -5083,37 +5053,40 @@ Future<void> loadTemplatesFromStorage() async {
         final dynamic rawVal = row['value'];
         if (rawVal == null) continue;
 
-        String jsonStr = '';
-        if (rawVal is String) {
-          jsonStr = rawVal;
-        } else {
-          jsonStr = jsonEncode(rawVal);
-        }
+        String jsonStr = rawVal is String ? rawVal : jsonEncode(rawVal);
+        if (jsonStr.isEmpty) continue;
 
-        if (jsonStr.isEmpty || jsonStr == '[]') continue;
-
-        try {
-          final List decoded = jsonDecode(jsonStr);
-          final loadedList = <VipTemplate>[];
-          for (final j in decoded) {
-            try {
-              if (j is Map) {
-                loadedList.add(VipTemplate.fromJson(Map<String, dynamic>.from(j)));
+        if (key == 'ai_api_key') {
+          final String cloudKey = jsonStr.replaceAll('"', '').trim();
+          if (cloudKey.isNotEmpty) {
+            aiApiKey = cloudKey;
+            aiApiProvider = 'Nano Banana Pro';
+          }
+        } else if (key == 'photo_templates' || key == 'video_templates') {
+          if (jsonStr == '[]') continue;
+          try {
+            final List decoded = jsonDecode(jsonStr);
+            final loadedList = <VipTemplate>[];
+            for (final j in decoded) {
+              try {
+                if (j is Map) {
+                  loadedList.add(VipTemplate.fromJson(Map<String, dynamic>.from(j)));
+                }
+              } catch (e, st) {
+                debugPrint('Error parsing $key item: $e\n$st');
               }
-            } catch (e, st) {
-              debugPrint('Error parsing $key item: $e\n$st');
             }
+            if (key == 'photo_templates') {
+              photoTemplatesList = loadedList;
+            } else if (key == 'video_templates') {
+              videoTemplatesList = loadedList;
+            }
+          } catch (e) {
+            debugPrint('Error decoding JSON for $key: $e');
           }
-          if (key == 'photo_templates') {
-            photoTemplatesList = loadedList;
-          } else if (key == 'video_templates') {
-            videoTemplatesList = loadedList;
-          }
-        } catch (e) {
-          debugPrint('Error decoding JSON for $key: $e');
         }
       }
-      debugPrint('Templates loaded from Supabase: photo=${photoTemplatesList.length}, video=${videoTemplatesList.length}');
+      debugPrint('Supabase storage loaded in 1 request: photo=${photoTemplatesList.length}, video=${videoTemplatesList.length}');
     } else {
       debugPrint('Supabase load failed: ${res.statusCode} ${res.body}');
     }
