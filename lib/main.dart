@@ -319,56 +319,33 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
   Future<void> _loadSavedApiKey() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? savedKey = prefs.getString('trendum_ai_api_key');
-      if (savedKey != null && savedKey.isNotEmpty) {
-        setState(() {
-          aiApiKey = savedKey;
-          aiApiProvider = 'Nano Banana Pro';
-          _apiKeyController.text = savedKey;
-        });
-      }
-
       // Загрузка API-ключа из Supabase
-      try {
-        final res = await http.get(
-          Uri.parse('$supabaseUrl/rest/v1/app_storage?key=eq.ai_api_key&select=*'),
-          headers: {
-            'apikey': supabaseAnonKey,
-            'Authorization': 'Bearer $supabaseAnonKey',
-          },
-        );
-        if (res.statusCode == 200) {
-          final List data = jsonDecode(res.body);
-          if (data.isNotEmpty && data[0]['value'] != null) {
-            final String cloudKey = data[0]['value'].toString();
-            if (cloudKey.isNotEmpty) {
-              if (mounted) {
-                setState(() {
-                  aiApiKey = cloudKey;
-                  aiApiProvider = 'Nano Banana Pro';
-                  _apiKeyController.text = cloudKey;
-                });
-              } else {
-                aiApiKey = cloudKey;
-                aiApiProvider = 'Nano Banana Pro';
-                _apiKeyController.text = cloudKey;
-              }
-              await prefs.setString('trendum_ai_api_key', cloudKey);
-            }
+      final res = await http.get(
+        Uri.parse('$supabaseUrl/rest/v1/app_storage?key=eq.ai_api_key&select=*'),
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': 'Bearer $supabaseAnonKey',
+        },
+      );
+      if (res.statusCode == 200) {
+        final List data = jsonDecode(res.body);
+        if (data.isNotEmpty && data[0]['value'] != null) {
+          final String cloudKey = data[0]['value'].toString();
+          if (cloudKey.isNotEmpty && mounted) {
+            setState(() {
+              aiApiKey = cloudKey;
+              aiApiProvider = 'Nano Banana Pro';
+              _apiKeyController.text = cloudKey;
+            });
           }
         }
-      } catch (e) {
-        debugPrint('Error loading API key from Supabase: $e');
-      }
-
-      await loadTemplatesFromStorage();
-      if (mounted) {
-        setState(() {});
       }
     } catch (e) {
-      debugPrint('Error loading saved API key/templates: $e');
+      debugPrint('Error loading API key from Supabase: $e');
     }
+
+    await loadTemplatesFromStorage();
+    if (mounted) setState(() {});
   }
 
   @override
@@ -880,10 +857,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                 final String key = _apiKeyController.text.trim();
                 aiApiKey = key;
                 aiApiProvider = 'Nano Banana Pro';
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('trendum_ai_api_key', key);
 
-                // Сохранение API-ключа в Supabase app_storage
+                // Сохранение API-ключа только в Supabase
                 try {
                   await http.post(
                     Uri.parse('$supabaseUrl/rest/v1/app_storage'),
@@ -904,7 +879,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('✅ API-ключ KIE.AI успешно сохранён (локально и в Supabase)!'),
+                      content: Text('✅ API-ключ KIE.AI успешно сохранён в Supabase!'),
                       backgroundColor: Color(0xFF4ade80),
                       duration: Duration(seconds: 2),
                     ),
@@ -4932,15 +4907,8 @@ const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ
 Future<void> saveTemplatesToStorage() async {
   final photoJson = jsonEncode(photoTemplatesList.map((t) => t.toJson()).toList());
   final videoJson = jsonEncode(videoTemplatesList.map((t) => t.toJson()).toList());
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('trendum_photo_templates', photoJson);
-    await prefs.setString('trendum_video_templates', videoJson);
-  } catch (e) {
-    debugPrint('Error saving templates locally: $e');
-  }
 
-  // Облачная синхронизация с Supabase
+  // Только Супабейс
   try {
     await http.post(
       Uri.parse('$supabaseUrl/rest/v1/app_storage'),
@@ -4955,29 +4923,14 @@ Future<void> saveTemplatesToStorage() async {
         {'key': 'video_templates', 'value': videoJson},
       ]),
     );
+    debugPrint('Templates saved to Supabase.');
   } catch (e) {
     debugPrint('Error saving templates to Supabase: $e');
   }
 }
 
 Future<void> loadTemplatesFromStorage() async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final String? photoJson = prefs.getString('trendum_photo_templates');
-    final String? videoJson = prefs.getString('trendum_video_templates');
-    if (photoJson != null && photoJson.isNotEmpty) {
-      final List decoded = jsonDecode(photoJson);
-      photoTemplatesList = decoded.map((j) => VipTemplate.fromJson(j as Map<String, dynamic>)).toList();
-    }
-    if (videoJson != null && videoJson.isNotEmpty) {
-      final List decoded = jsonDecode(videoJson);
-      videoTemplatesList = decoded.map((j) => VipTemplate.fromJson(j as Map<String, dynamic>)).toList();
-    }
-  } catch (e) {
-    debugPrint('Error loading templates locally: $e');
-  }
-
-  // Загрузка из облака Supabase
+  // Только Супабейс
   try {
     final res = await http.get(
       Uri.parse('$supabaseUrl/rest/v1/app_storage?select=*'),
@@ -4988,23 +4941,18 @@ Future<void> loadTemplatesFromStorage() async {
     );
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
-      bool updated = false;
       for (final row in data) {
         if (row['key'] == 'photo_templates' && row['value'] != null) {
           final List decoded = jsonDecode(row['value']);
           photoTemplatesList = decoded.map((j) => VipTemplate.fromJson(j as Map<String, dynamic>)).toList();
-          updated = true;
         } else if (row['key'] == 'video_templates' && row['value'] != null) {
           final List decoded = jsonDecode(row['value']);
           videoTemplatesList = decoded.map((j) => VipTemplate.fromJson(j as Map<String, dynamic>)).toList();
-          updated = true;
         }
       }
-      if (updated) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('trendum_photo_templates', jsonEncode(photoTemplatesList.map((t) => t.toJson()).toList()));
-        await prefs.setString('trendum_video_templates', jsonEncode(videoTemplatesList.map((t) => t.toJson()).toList()));
-      }
+      debugPrint('Templates loaded from Supabase: photo=${photoTemplatesList.length}, video=${videoTemplatesList.length}');
+    } else {
+      debugPrint('Supabase load failed: ${res.statusCode} ${res.body}');
     }
   } catch (e) {
     debugPrint('Error loading templates from Supabase: $e');
