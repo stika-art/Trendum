@@ -80,6 +80,7 @@ String aiApiKey = '';
 // Списки элементов каталогов (глобальные, чтобы к ним был легкий доступ из любого экрана)
 List<VipTemplate> photoTemplatesList = [];
 List<VipTemplate> videoTemplatesList = [];
+bool isLoadingTemplates = true; // Глобальный флаг загрузки шаблонов
 List<VipGame> gamesCatalogList = [];
 List<VipTrend> trendsCatalogList = [];
 
@@ -345,7 +346,10 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     }
 
     await loadTemplatesFromStorage();
-    if (mounted) setState(() {});
+    isLoadingTemplates = false;
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -2515,8 +2519,41 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
       children: [
         _buildStepHeader(isPhoto ? 'Шаблоны Фото' : 'Шаблоны Видео', _resetToCategories),
         Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
+          child: isLoadingTemplates
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 48, height: 48,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFFCF9E42)),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Загрузка шаблонов...',
+                        style: TextStyle(color: Colors.white38, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                )
+              : templates.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.photo_library_outlined, color: Colors.white24, size: 64),
+                          const SizedBox(height: 16),
+                          const Text('Шаблонов пока нет', style: TextStyle(color: Colors.white38, fontSize: 16)),
+                          const SizedBox(height: 8),
+                          const Text('Добавьте шаблоны в панели администратора', style: TextStyle(color: Colors.white24, fontSize: 12)),
+                        ],
+                      ),
+                    )
+              : LayoutBuilder(
+                  builder: (context, constraints) {
               final int cols = constraints.maxWidth > 500 ? 3 : 2;
               return GridView.count(
                 physics: const BouncingScrollPhysics(),
