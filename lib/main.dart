@@ -2518,16 +2518,12 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
     final bool isPhoto = _selectedCategory == 'фото';
     final List<VipTemplate> templates = isPhoto ? photoTemplatesList : videoTemplatesList;
 
-    if (isLoadingTemplates && templates.isNotEmpty) {
-      isLoadingTemplates = false;
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildStepHeader(isPhoto ? 'Шаблоны Фото' : 'Шаблоны Видео', _resetToCategories),
         Expanded(
-          child: (isLoadingTemplates && templates.isEmpty)
+          child: isLoadingTemplates
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -5076,7 +5072,9 @@ Future<void> loadTemplatesFromStorage() async {
           final loadedList = <VipTemplate>[];
           for (final j in decoded) {
             try {
-              loadedList.add(VipTemplate.fromJson(j as Map<String, dynamic>));
+              if (j is Map) {
+                loadedList.add(VipTemplate.fromJson(Map<String, dynamic>.from(j)));
+              }
             } catch (e, st) {
               debugPrint('Error parsing photo template item: $e\n$st');
             }
@@ -5087,7 +5085,9 @@ Future<void> loadTemplatesFromStorage() async {
           final loadedList = <VipTemplate>[];
           for (final j in decoded) {
             try {
-              loadedList.add(VipTemplate.fromJson(j as Map<String, dynamic>));
+              if (j is Map) {
+                loadedList.add(VipTemplate.fromJson(Map<String, dynamic>.from(j)));
+              }
             } catch (e, st) {
               debugPrint('Error parsing video template item: $e\n$st');
             }
@@ -5101,6 +5101,8 @@ Future<void> loadTemplatesFromStorage() async {
     }
   } catch (e, st) {
     debugPrint('Error loading templates from Supabase: $e\n$st');
+  } finally {
+    isLoadingTemplates = false;
   }
 }
 
