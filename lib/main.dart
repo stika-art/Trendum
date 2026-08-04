@@ -4946,6 +4946,21 @@ class VipTemplate {
     };
   }
 
+  static Uint8List? _safeBase64Decode(dynamic input) {
+    if (input == null || input is! String || input.isEmpty) return null;
+    try {
+      String str = input.trim();
+      if (str.contains(',')) {
+        str = str.split(',').last;
+      }
+      str = str.replaceAll(RegExp(r'\s+'), '');
+      return base64Decode(str);
+    } catch (e) {
+      debugPrint('Base64 decode error: $e');
+      return null;
+    }
+  }
+
   factory VipTemplate.fromJson(Map<String, dynamic> json) {
     List<Color> colors = [];
     if (json['gradientColors'] != null) {
@@ -4959,7 +4974,10 @@ class VipTemplate {
 
     List<Uint8List>? pBytes;
     if (json['promptImageBytes'] != null) {
-      pBytes = (json['promptImageBytes'] as List).map((s) => base64Decode(s as String)).toList();
+      pBytes = (json['promptImageBytes'] as List)
+          .map((s) => _safeBase64Decode(s))
+          .whereType<Uint8List>()
+          .toList();
     }
 
     final dynamic rawIcon = json['icon'];
@@ -4983,12 +5001,12 @@ class VipTemplate {
       prompt: json['prompt'],
       instructionText: json['instructionText'],
       instructionMediaPath: json['instructionMediaPath'],
-      instructionMediaBytes: json['instructionMediaBytes'] != null ? base64Decode(json['instructionMediaBytes']) : null,
+      instructionMediaBytes: _safeBase64Decode(json['instructionMediaBytes']),
       promptImagePaths: json['promptImagePaths'] != null ? List<String>.from(json['promptImagePaths']) : null,
       promptImageBytes: pBytes,
       resultImagePath: json['resultImagePath'],
       coverImagePath: json['coverImagePath'],
-      coverImageBytes: json['coverImageBytes'] != null ? base64Decode(json['coverImageBytes']) : null,
+      coverImageBytes: _safeBase64Decode(json['coverImageBytes']),
     );
   }
 }
@@ -5045,16 +5063,32 @@ Future<void> loadTemplatesFromStorage() async {
         'apikey': supabaseAnonKey,
         'Authorization': 'Bearer $supabaseAnonKey',
       },
-    ).timeout(const Duration(seconds: 5));
+    ).timeout(const Duration(seconds: 4));
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
       for (final row in data) {
         if (row['key'] == 'photo_templates' && row['value'] != null) {
           final List decoded = jsonDecode(row['value']);
-          photoTemplatesList = decoded.map((j) => VipTemplate.fromJson(j as Map<String, dynamic>)).toList();
+          final loadedList = <VipTemplate>[];
+          for (final j in decoded) {
+            try {
+              loadedList.add(VipTemplate.fromJson(j as Map<String, dynamic>));
+            } catch (e, st) {
+              debugPrint('Error parsing photo template item: $e\n$st');
+            }
+          }
+          photoTemplatesList = loadedList;
         } else if (row['key'] == 'video_templates' && row['value'] != null) {
           final List decoded = jsonDecode(row['value']);
-          videoTemplatesList = decoded.map((j) => VipTemplate.fromJson(j as Map<String, dynamic>)).toList();
+          final loadedList = <VipTemplate>[];
+          for (final j in decoded) {
+            try {
+              loadedList.add(VipTemplate.fromJson(j as Map<String, dynamic>));
+            } catch (e, st) {
+              debugPrint('Error parsing video template item: $e\n$st');
+            }
+          }
+          videoTemplatesList = loadedList;
         }
       }
       debugPrint('Templates loaded from Supabase: photo=${photoTemplatesList.length}, video=${videoTemplatesList.length}');
