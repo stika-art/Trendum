@@ -1983,6 +1983,7 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
   bool _phoneConnected = false;
   int _countdownValue = 0;
   bool _isRecording = false;
+  bool _isCameraFlash = false;
   double _recordingProgress = 0.0;
   
   // Игровая симуляция (Gesture Runner)
@@ -2062,13 +2063,21 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
           });
           _startRecording();
         } else {
-          // Для Фото шаблонов: сразу после обратного отсчета делаем снимок и переходим к обработке
+          // Для Фото шаблонов: мгновенный снимок (вспышка затвора) и сразу к обработке
           setState(() {
             _countdownValue = 0;
             _isRecording = false;
-            _pageState = TrendsPageState.processing;
+            _isCameraFlash = true;
           });
-          _startProcessing();
+          Future.delayed(const Duration(milliseconds: 200), () {
+            if (mounted) {
+              setState(() {
+                _isCameraFlash = false;
+                _pageState = TrendsPageState.processing;
+              });
+              _startProcessing();
+            }
+          });
         }
       }
     });
@@ -2280,8 +2289,8 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
       });
     }
 
-    const int durationMs = 4000;
-    const int stepMs = 60;
+    final int durationMs = isVideo ? 4000 : (isAi ? 2000 : 500);
+    const int stepMs = 50;
     int elapsed = 0;
 
     _processingTimer = Timer.periodic(const Duration(milliseconds: stepMs), (timer) {
@@ -2924,6 +2933,14 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
                           ],
                         ),
                       ),
+                    ),
+                  ),
+
+                // Яркая вспышка затвора камеры при снимке фото
+                if (_isCameraFlash)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.white.withValues(alpha: 0.95),
                     ),
                   ),
 
