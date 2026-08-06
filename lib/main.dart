@@ -319,10 +319,11 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _loadSavedApiKey() async {
-    await loadTemplatesFromStorage();
-    if (mounted) {
-      setState(() {});
-    }
+    await loadTemplatesFromStorage(onUpdate: () {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   @override
@@ -1939,10 +1940,11 @@ class _VipTrendsPageState extends State<VipTrendsPage> with TickerProviderStateM
     if (_isFetchingTemplatesFromCloud) return;
     _isFetchingTemplatesFromCloud = true;
     try {
-      await loadTemplatesFromStorage();
-      if (mounted) {
-        setState(() {});
-      }
+      await loadTemplatesFromStorage(onUpdate: () {
+        if (mounted) {
+          setState(() {});
+        }
+      });
     } finally {
       _isFetchingTemplatesFromCloud = false;
     }
@@ -5014,7 +5016,16 @@ Future<void> saveTemplatesToStorage() async {
   final photoJson = jsonEncode(photoTemplatesList.map((t) => t.toJson()).toList());
   final videoJson = jsonEncode(videoTemplatesList.map((t) => t.toJson()).toList());
 
-  // Только Супабейс
+  // 1. Сохранение локально в SharedPreferences для мгновенного доступа на киоске
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('trendum_photo_templates', photoJson);
+    await prefs.setString('trendum_video_templates', videoJson);
+  } catch (e) {
+    debugPrint('Error saving templates to SharedPreferences: $e');
+  }
+
+  // 2. Облачная синхронизация с Supabase
   try {
     await http.post(
       Uri.parse('$supabaseUrl/rest/v1/app_storage'),
@@ -5035,8 +5046,57 @@ Future<void> saveTemplatesToStorage() async {
   }
 }
 
-Future<void> loadTemplatesFromStorage() async {
-  // Загружаем ВСЕ данные (ключ + шаблоны) за один быстрый запрос в ~300мс
+Future<void> loadTemplatesFromStorage({VoidCallback? onUpdate}) async {
+  // 1. МГНОВЕННАЯ ЗАГРУЗКА ИЗ ЛОКАЛЬНОГО КЭША (0мс — без ожидания сети на киоске)
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final String? cachedPhoto = prefs.getString('trendum_photo_templates');
+    final String? cachedVideo = prefs.getString('trendum_video_templates');
+    final String? cachedKey = prefs.getString('trendum_ai_api_key');
+
+    if (cachedKey != null && cachedKey.isNotEmpty) {
+      aiApiKey = cachedKey;
+      aiApiProvider = 'Nano Banana Pro';
+    }
+
+    if (cachedPhoto != null && cachedPhoto.isNotEmpty) {
+      final List decoded = jsonDecode(cachedPhoto);
+      final loadedList = <VipTemplate>[];
+      for (final j in decoded) {
+        if (j is Map) {
+          try {
+            loadedList.add(VipTemplate.fromJson(Map<String, dynamic>.from(j)));
+          } catch (e) {
+            debugPrint('Error parsing cached photo template: $e');
+          }
+        }
+      }
+      photoTemplatesList = loadedList;
+    }
+
+    if (cachedVideo != null && cachedVideo.isNotEmpty) {
+      final List decoded = jsonDecode(cachedVideo);
+      final loadedList = <VipTemplate>[];
+      for (final j in decoded) {
+        if (j is Map) {
+          try {
+            loadedList.add(VipTemplate.fromJson(Map<String, dynamic>.from(j)));
+          } catch (e) {
+            debugPrint('Error parsing cached video template: $e');
+          }
+        }
+      }
+      videoTemplatesList = loadedList;
+    }
+
+    if (onUpdate != null) {
+      onUpdate();
+    }
+  } catch (e) {
+    debugPrint('Error loading local template cache: $e');
+  }
+
+  // 2. ФОНОВАЯ ПРОВЕРКА ОБЛАКА SUPABASE (свешиваем новые и сразу удаляем отсутствующие в базе)
   try {
     final res = await http.get(
       Uri.parse('$supabaseUrl/rest/v1/app_storage?select=*'),
@@ -5044,56 +5104,66 @@ Future<void> loadTemplatesFromStorage() async {
         'apikey': supabaseAnonKey,
         'Authorization': 'Bearer $supabaseAnonKey',
       },
-    ).timeout(const Duration(seconds: 4));
+    ).timeout(const Duration(seconds: 5));
 
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
+      final prefs = await SharedPreferences.getInstance();
+
       for (final row in data) {
         final String key = (row['key'] ?? '').toString();
         final dynamic rawVal = row['value'];
         if (rawVal == null) continue;
 
         String jsonStr = rawVal is String ? rawVal : jsonEncode(rawVal);
-        if (jsonStr.isEmpty) continue;
 
         if (key == 'ai_api_key') {
           final String cloudKey = jsonStr.replaceAll('"', '').trim();
           if (cloudKey.isNotEmpty) {
             aiApiKey = cloudKey;
             aiApiProvider = 'Nano Banana Pro';
+            await prefs.setString('trendum_ai_api_key', cloudKey);
           }
         } else if (key == 'photo_templates' || key == 'video_templates') {
-          if (jsonStr == '[]') continue;
-          try {
-            final List decoded = jsonDecode(jsonStr);
-            final loadedList = <VipTemplate>[];
-            for (final j in decoded) {
-              try {
+          final loadedList = <VipTemplate>[];
+          if (jsonStr.isNotEmpty && jsonStr != '[]') {
+            try {
+              final List decoded = jsonDecode(jsonStr);
+              for (final j in decoded) {
                 if (j is Map) {
-                  loadedList.add(VipTemplate.fromJson(Map<String, dynamic>.from(j)));
+                  try {
+                    loadedList.add(VipTemplate.fromJson(Map<String, dynamic>.from(j)));
+                  } catch (e, st) {
+                    debugPrint('Error parsing $key item: $e\n$st');
+                  }
                 }
-              } catch (e, st) {
-                debugPrint('Error parsing $key item: $e\n$st');
               }
+            } catch (e) {
+              debugPrint('Error decoding JSON for $key: $e');
             }
-            if (key == 'photo_templates') {
-              photoTemplatesList = loadedList;
-            } else if (key == 'video_templates') {
-              videoTemplatesList = loadedList;
-            }
-          } catch (e) {
-            debugPrint('Error decoding JSON for $key: $e');
+          }
+
+          if (key == 'photo_templates') {
+            photoTemplatesList = loadedList;
+            await prefs.setString('trendum_photo_templates', jsonEncode(loadedList.map((t) => t.toJson()).toList()));
+          } else if (key == 'video_templates') {
+            videoTemplatesList = loadedList;
+            await prefs.setString('trendum_video_templates', jsonEncode(loadedList.map((t) => t.toJson()).toList()));
           }
         }
       }
-      debugPrint('Supabase storage loaded in 1 request: photo=${photoTemplatesList.length}, video=${videoTemplatesList.length}');
-    } else {
-      debugPrint('Supabase load failed: ${res.statusCode} ${res.body}');
+      debugPrint('Supabase background sync complete: photo=${photoTemplatesList.length}, video=${videoTemplatesList.length}');
+      if (onUpdate != null) {
+        onUpdate();
+      }
     }
   } catch (e, st) {
-    debugPrint('Error loading templates from Supabase: $e\n$st');
+    debugPrint('Error or timeout during Supabase background sync: $e\n$st');
   } finally {
     isLoadingTemplates = false;
+    if (onUpdate != null) {
+      onUpdate();
+    }
   }
 }
 
